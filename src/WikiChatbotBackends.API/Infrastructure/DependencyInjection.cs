@@ -29,9 +29,9 @@ public static class DependencyInjection
         services.AddScoped<IJwtService>(sp => new JwtService(jwtSecret, jwtIssuer, jwtAudience, jwtExpirationMinutes));
 
         // Application Services
-        services.AddScoped<IPeopleService, PeopleService>();
-        services.AddScoped<IAwardService, AwardService>();
-        services.AddScoped<ITagService, TagService>();
+        //services.AddScoped<IPeopleService, PeopleService>();
+        //services.AddScoped<IAwardService, AwardService>();
+        //services.AddScoped<ITagService, TagService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
 
