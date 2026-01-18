@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using WikiChatbotBackends.API.Application.DTOs;
-using WikiChatbotBackends.API.Application.Interfaces;
+using WikiChatbotBackends.Application.DTOs;
+using WikiChatbotBackends.Application.Interfaces;
 
 namespace WikiChatbotBackends.API.Controllers;
 

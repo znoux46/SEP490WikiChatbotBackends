@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using WikiChatbotBackends.API.Domain.Entities;
+using WikiChatbotBackends.Domain.Entities;
 
-namespace WikiChatbotBackends.API.Infrastructure.Data;
+namespace WikiChatbotBackends.Infrastructure.Data;
 
 public class ApplicationDbContext : DbContext
 {

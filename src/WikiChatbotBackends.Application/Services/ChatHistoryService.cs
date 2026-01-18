@@ -1,8 +1,8 @@
-using WikiChatbotBackends.API.Application.DTOs;
-using WikiChatbotBackends.API.Application.Interfaces;
-using WikiChatbotBackends.API.Domain.Entities;
+using WikiChatbotBackends.Application.DTOs;
+using WikiChatbotBackends.Application.Interfaces;
+using WikiChatbotBackends.Domain.Entities;
 
-namespace WikiChatbotBackends.API.Application.Services;
+namespace WikiChatbotBackends.Application.Services;
 
 public class ChatHistoryService : IChatHistoryService
 {

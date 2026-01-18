@@ -1,4 +1,4 @@
-namespace WikiChatbotBackends.API.Application.Interfaces;
+namespace WikiChatbotBackends.Application.Interfaces;
 
 public interface IJwtService
 {

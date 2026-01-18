@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using WikiChatbotBackends.API.Application.Interfaces;
+using WikiChatbotBackends.Application.Interfaces;
 
 namespace WikiChatbotBackends.API.Middleware;
 
