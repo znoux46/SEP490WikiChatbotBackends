@@ -1,9 +1,9 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
-using WikiChatbotBackends.API.Application.Interfaces;
-using WikiChatbotBackends.API.Infrastructure.Data;
+using WikiChatbotBackends.Application.Interfaces;
+using WikiChatbotBackends.Infrastructure.Data;
 
-namespace WikiChatbotBackends.API.Infrastructure.Repositories;
+namespace WikiChatbotBackends.Infrastructure.Repositories;
 
 public class Repository<T> : IRepository<T> where T : class
 {

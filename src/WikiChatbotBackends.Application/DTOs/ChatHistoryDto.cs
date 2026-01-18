@@ -1,4 +1,4 @@
-namespace WikiChatbotBackends.API.Application.DTOs;
+namespace WikiChatbotBackends.Application.DTOs;
 
 public class ChatHistoryDto
 {

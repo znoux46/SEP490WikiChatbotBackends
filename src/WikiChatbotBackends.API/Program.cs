@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using WikiChatbotBackends.API.Infrastructure;
-using WikiChatbotBackends.API.Infrastructure.Data;
+using WikiChatbotBackends.Infrastructure;
+using WikiChatbotBackends.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 

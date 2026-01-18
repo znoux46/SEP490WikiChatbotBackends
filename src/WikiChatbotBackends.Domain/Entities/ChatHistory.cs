@@ -1,4 +1,4 @@
-namespace WikiChatbotBackends.API.Domain.Entities;
+namespace WikiChatbotBackends.Domain.Entities;
 
 public class ChatHistory
 {

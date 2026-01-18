@@ -1,6 +1,6 @@
-using WikiChatbotBackends.API.Application.DTOs;
+using WikiChatbotBackends.Application.DTOs;
 
-namespace WikiChatbotBackends.API.Application.Interfaces;
+namespace WikiChatbotBackends.Application.Interfaces;
 
 public interface IAuthService
 {

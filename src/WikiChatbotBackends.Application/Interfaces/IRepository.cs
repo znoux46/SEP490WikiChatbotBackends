@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 
-namespace WikiChatbotBackends.API.Application.Interfaces;
+namespace WikiChatbotBackends.Application.Interfaces;
 
 public interface IRepository<T> where T : class
 {
