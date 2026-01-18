@@ -13,5 +13,5 @@ public class User
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public ICollection<ChatHistory> ChatHistories { get; set; } = new List<ChatHistory>();
+    public ICollection<ChatSession> ChatSessions { get; set; } = new List<ChatSession>();
 }

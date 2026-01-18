@@ -10,6 +10,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<User> Users { get; set; }
+    public DbSet<ChatSession> ChatSessions { get; set; }
     public DbSet<ChatHistory> ChatHistories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -29,18 +30,31 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.Email).IsUnique();
         });
 
+        // ChatSession configuration (Head table)
+        modelBuilder.Entity<ChatSession>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.SessionId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.SessionName).IsRequired().HasMaxLength(200);
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.ChatSessions)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.SessionId).IsUnique(); // SessionId phải unique
+            entity.HasIndex(e => e.UserId);
+        });
+
         // ChatHistory configuration
         modelBuilder.Entity<ChatHistory>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.SessionId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Question).IsRequired().HasColumnType("text");
             entity.Property(e => e.Answer).IsRequired().HasColumnType("text");
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.ChatHistories)
-                .HasForeignKey(e => e.UserId)
+            entity.HasOne(e => e.Session)
+                .WithMany(s => s.ChatHistories)
+                .HasForeignKey(e => e.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => new { e.UserId, e.SessionId });
+            entity.HasIndex(e => e.SessionId);
         });
     }
 }
