@@ -92,14 +92,14 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Wikipedia Chatbot API v1");
     });
-}
+//}
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
