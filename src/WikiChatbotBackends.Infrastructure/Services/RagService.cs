@@ -38,9 +38,10 @@ namespace WikiChatbotBackends.Infrastructure.Services
             {
                 _logger.LogInformation("Sending chat request to RAG service: {Question}", request.Question);
 
-                var response = await _httpClient.PostAsJsonAsync("/chat", new
+                var response = await _httpClient.PostAsJsonAsync("/api/v1/chat", new
                 {
                     question = request.Question,
+                    document_ids = request.DocumentIds,
                     verbose = request.Verbose
                 });
 

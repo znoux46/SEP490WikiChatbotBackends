@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace WikiChatbotBackends.Application.DTOs
 {
@@ -9,8 +10,13 @@ namespace WikiChatbotBackends.Application.DTOs
     
     public class ChatRequest
     {
+        [JsonPropertyName("question")]
         public string Question { get; set; } = string.Empty;
+
+        [JsonPropertyName("document_ids")]
         public List<string>? DocumentIds { get; set; }
+
+        [JsonPropertyName("verbose")]
         public bool Verbose { get; set; } = false;
     }
 
@@ -68,16 +74,28 @@ namespace WikiChatbotBackends.Application.DTOs
 
     public class FileUploadResult
     {
+        [JsonPropertyName("filename")]
         public string Filename { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty; // processing, duplicate, failed
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("job_id")] // Phải map từ snake_case
         public string? JobId { get; set; }
+
+        [JsonPropertyName("document_id")]
         public string? DocumentId { get; set; }
+
+        [JsonPropertyName("message")]
         public string? Message { get; set; }
     }
 
     public class DocumentUploadResponse
     {
+        [JsonPropertyName("total_files")] // Map từ total_files trong MultiFileUploadResponse
         public int TotalFiles { get; set; }
+
+        [JsonPropertyName("results")]
         public List<FileUploadResult> Results { get; set; } = new();
     }
 
@@ -87,13 +105,28 @@ namespace WikiChatbotBackends.Application.DTOs
     
     public class DocumentInfo
     {
+        [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("file_path")] // Quan trọng: FastAPI trả về file_path
         public string FilePath { get; set; } = string.Empty;
+
+        [JsonPropertyName("file_name")] // Quan trọng: FastAPI trả về file_name
         public string FileName { get; set; } = string.Empty;
+
+        [JsonPropertyName("source_type")]
         public string SourceType { get; set; } = string.Empty;
+
+        [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("metadata")]
         public Dictionary<string, object>? Metadata { get; set; }
+
+        [JsonPropertyName("created_at")]
         public DateTime CreatedAt { get; set; }
+
+        [JsonPropertyName("chunk_count")] // Map chính xác count từ FastAPI
         public int? ChunkCount { get; set; }
     }
 
