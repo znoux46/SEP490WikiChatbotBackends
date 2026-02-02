@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
@@ -8,13 +9,16 @@ public class ChatHistoryService : IChatHistoryService
 {
     private readonly IRepository<ChatSession> _sessionRepository;
     private readonly IRepository<ChatHistory> _chatHistoryRepository;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public ChatHistoryService(
         IRepository<ChatSession> sessionRepository,
-        IRepository<ChatHistory> chatHistoryRepository)
+        IRepository<ChatHistory> chatHistoryRepository,
+        IHttpContextAccessor httpContextAccessor)
     {
         _sessionRepository = sessionRepository;
         _chatHistoryRepository = chatHistoryRepository;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     // Session methods
@@ -213,5 +217,79 @@ public class ChatHistoryService : IChatHistoryService
             throw new UnauthorizedAccessException("You don't have permission to delete this history");
 
         await _chatHistoryRepository.DeleteAsync(history);
+    }
+
+    /// <summary>
+    /// Tự động lấy thông tin từ HttpContext để lưu lịch sử Chat
+    /// </summary>
+    public async Task SaveChatHistoryWithContextAsync(string question, string answer)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext == null) return;
+
+        // 1. Lấy UserId từ Claims (nếu không có thì mặc định là 0 hoặc xử lý tùy ý)
+        var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdClaim, out int userId))
+        {
+            // Nếu bạn muốn cho phép lưu lịch sử cho khách (Anonymous), 
+            // bạn cần một UserId mặc định hoặc bỏ qua logic này.
+            userId = 0;
+        }
+
+        try
+        {
+            // 2. Lấy SessionId (GUID string) từ Header hoặc tạo mới
+            var sessionIdString = httpContext.Request.Headers["X-Session-Id"].FirstOrDefault()
+                                  ?? Guid.NewGuid().ToString();
+
+            // 3. Tìm hoặc tạo Session dựa trên SessionId (string) và UserId
+            var sessions = await _sessionRepository.FindAsync(s => s.UserId == userId && s.SessionId == sessionIdString);
+            var session = sessions.FirstOrDefault();
+
+            int internalSessionId;
+
+            if (session == null)
+            {
+                // Tạo session mới nếu chưa tồn tại
+                var newSession = new ChatSession
+                {
+                    UserId = userId,
+                    SessionId = sessionIdString,
+                    SessionName = question.Length > 30 ? question.Substring(0, 27) + "..." : question,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                var created = await _sessionRepository.AddAsync(newSession);
+                internalSessionId = created.Id;
+            }
+            else
+            {
+                internalSessionId = session.Id;
+            }
+
+            // 4. Lưu vào ChatHistory
+            var history = new ChatHistory
+            {
+                SessionId = internalSessionId,
+                Question = question,
+                Answer = answer,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _chatHistoryRepository.AddAsync(history);
+
+            // Cập nhật thời gian cho Session
+            if (session != null)
+            {
+                session.UpdatedAt = DateTime.UtcNow;
+                await _sessionRepository.UpdateAsync(session);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log lỗi nhưng không làm gián đoạn luồng trả lời của AI
+            // _logger.LogError(ex, "Failed to save history in service");
+        }
     }
 }

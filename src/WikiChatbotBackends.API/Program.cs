@@ -86,6 +86,8 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddHttpContextAccessor();
+
 // Infrastructure (Database, Repositories, Services)
 builder.Services.AddInfrastructure(builder.Configuration);
 

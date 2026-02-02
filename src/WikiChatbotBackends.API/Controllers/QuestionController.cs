@@ -25,85 +25,22 @@ namespace WikiChatbotBackends.API.Controllers
             _logger = logger;
         }
 
-        /// <summary>
-        /// Send a question to the RAG system and get an AI-generated answer
-        /// The question and answer will be saved to chat history
-        /// </summary>
-        /// <param name="request">Chat request containing the question</param>
-        /// <returns>Chat response with answer and metadata</returns>
+        [AllowAnonymous] // Bỏ qua authorize
         [HttpPost]
-        [ProducesResponseType(typeof(ChatResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ChatResponse>> AskQuestion([FromBody] ChatRequest request)
         {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(request.Question))
-                {
-                    return BadRequest(new { message = "Question cannot be empty" });
-                }
+            // 1. Kiểm tra đầu vào
+            if (string.IsNullOrWhiteSpace(request.Question))
+                return BadRequest(new { message = "Question cannot be empty" });
 
-                _logger.LogInformation("Processing question: {Question}", request.Question);
+            // 2. Gọi RAG lấy câu trả lời
+            var response = await _ragService.ChatAsync(request);
 
-                // Call RAG service to get answer
-                var response = await _ragService.ChatAsync(request);
+            // 3. Lưu lịch sử (Service tự bóc tách HttpContext để lấy User/Session)
+            // Bạn không cần lo về Try-Catch ở đây vì trong Service đã xử lý rồi
+            await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer);
 
-                // Get user ID from JWT token
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (int.TryParse(userIdClaim, out int userId))
-                {
-                    try
-                    {
-                        // Get or create session
-                        var sessionIdString = HttpContext.Request.Headers["X-Session-Id"].FirstOrDefault() 
-                            ?? Guid.NewGuid().ToString();
-
-                        // Try to get existing sessions to find the session by SessionId (GUID string)
-                        var sessions = await _chatHistoryService.GetUserSessionsAsync(userId);
-                        var existingSession = sessions.FirstOrDefault(s => s.SessionId == sessionIdString);
-
-                        int sessionId;
-                        if (existingSession == null)
-                        {
-                            // Create new session
-                            var newSession = await _chatHistoryService.CreateSessionAsync(userId, new CreateChatSessionDto
-                            {
-                                SessionId = sessionIdString,
-                                SessionName = $"Chat {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
-                            });
-                            sessionId = newSession.Id;
-                        }
-                        else
-                        {
-                            sessionId = existingSession.Id;
-                        }
-
-                        // Save chat history
-                        var createHistoryDto = new CreateChatHistoryDto
-                        {
-                            SessionId = sessionId,
-                            Question = request.Question,
-                            Answer = response.Answer
-                        };
-
-                        await _chatHistoryService.CreateChatHistoryAsync(userId, createHistoryDto);
-                        _logger.LogInformation("Chat history saved for user {UserId}, session {SessionId}", userId, sessionIdString);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to save chat history, but continuing with response");
-                        // Don't fail the request if history save fails
-                    }
-                }
-
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing question: {Question}", request.Question);
-                return StatusCode(500, new { message = "An error occurred while processing your question", error = ex.Message });
-            }
+            return Ok(response);
         }
 
         /// <summary>
