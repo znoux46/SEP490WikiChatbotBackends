@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace WikiChatbotBackends.Application.DTOs
@@ -17,6 +18,7 @@ namespace WikiChatbotBackends.Application.DTOs
         public List<string>? DocumentIds { get; set; }
 
         [JsonPropertyName("verbose")]
+        [DefaultValue(false)]
         public bool Verbose { get; set; } = false;
     }
 
