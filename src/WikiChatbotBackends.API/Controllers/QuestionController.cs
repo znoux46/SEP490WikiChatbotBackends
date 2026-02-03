@@ -36,10 +36,11 @@ namespace WikiChatbotBackends.API.Controllers
             // 2. Gọi RAG lấy câu trả lời
             var response = await _ragService.ChatAsync(request);
 
-            // 3. Lưu lịch sử (Service tự bóc tách HttpContext để lấy User/Session)
-            // Bạn không cần lo về Try-Catch ở đây vì trong Service đã xử lý rồi
-            await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer);
-
+            if (User.Identity?.IsAuthenticated == true) 
+            {
+                await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer);
+            }
+            
             return Ok(response);
         }
 
