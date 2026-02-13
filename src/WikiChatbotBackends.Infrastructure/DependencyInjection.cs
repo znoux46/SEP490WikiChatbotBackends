@@ -33,6 +33,7 @@ public static class DependencyInjection
         // Application Services
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
+        services.AddScoped<IAdminService, AdminService>();
 
         // RAG Service with HttpClient
         services.AddHttpClient<IRagService, RagService>();
