@@ -48,14 +48,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// CORS
+// Cấu hình CORS đã sửa
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowAll", policy => 
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                "https://wikichatboxfe-hvabggc9hkdnh6fu.japanwest-01.azurewebsites.net",
+                "https://wikichatboxai.xyz"
+              )
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // Quan trọng: Cho phép gửi kèm Token/Cookie/Session
     });
 });
 
