@@ -50,14 +50,18 @@ builder.Services.AddSwaggerGen(c =>
     c.CustomSchemaIds(type => type.FullName);
 });
 
-// CORS
+// CORS - Cập nhật lại chính sách này
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                "https://wikichatboxfe-hvabggc9hkdnh6fu.japanwest-01.azurewebsites.net",
+                "https://wikichatboxai.xyz"
+              )
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // Rất quan trọng để hỗ trợ Login/Session
     });
 });
 
