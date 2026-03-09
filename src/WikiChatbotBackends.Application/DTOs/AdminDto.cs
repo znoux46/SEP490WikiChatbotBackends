@@ -86,3 +86,58 @@ public class ChatSessionQueryDto
     public bool SortDescending { get; set; } = true;
 }
 
+// Time-based statistics grouped by day/week/month
+public enum TimeGrouping
+{
+    Day,
+    Week,
+    Month
+}
+
+public class TimeSeriesStatsDto
+{
+    public DateTime Period { get; set; }
+    public string PeriodLabel { get; set; } = string.Empty;
+    public int MessageCount { get; set; }
+    public int SessionCount { get; set; }
+    public int UserCount { get; set; }
+}
+
+public class UserGrowthDto
+{
+    public DateTime Period { get; set; }
+    public string PeriodLabel { get; set; } = string.Empty;
+    public int NewUsers { get; set; }
+    public int TotalUsers { get; set; }
+    public double GrowthRate { get; set; }
+}
+
+public class UserGrowthStatsDto
+{
+    public DateTime Date { get; set; }
+    public int NewUsers { get; set; }
+    public int CumulativeUsers { get; set; }
+}
+
+public class ActiveUserDto
+{
+    public int UserId { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public int TotalQuestions { get; set; }
+    public int TotalDocuments { get; set; }
+    public int TotalSessions { get; set; }
+    public DateTime LastActiveAt { get; set; }
+}
+
+public class TopActiveUsersQueryDto
+{
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public string SortBy { get; set; } = "TotalQuestions"; // TotalQuestions, TotalDocuments, TotalSessions
+    public bool SortDescending { get; set; } = true;
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+}
+
