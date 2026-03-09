@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
 using WikiChatbotBackends.Infrastructure.Data;
@@ -68,4 +69,57 @@ public class UserRepository : Repository<User>, IUserRepository
     {
         return await _dbSet.CountAsync(u => u.CreatedAt >= startDate && u.CreatedAt < endDate);
     }
+
+    public async Task<List<UserGrowthStatsDto>> GetUserGrowthStatsAsync(DateTime startDate, DateTime endDate)
+    {
+        var stats = new List<UserGrowthStatsDto>();
+        var allUsers = await _dbSet
+            .Where(u => u.CreatedAt <= endDate)
+            .OrderBy(u => u.CreatedAt)
+            .ToListAsync();
+
+        var currentDate = startDate.Date;
+        var cumulativeUsers = 0;
+
+        // Count users before start date
+        var usersBeforeStart = await _dbSet.CountAsync(u => u.CreatedAt < startDate);
+        cumulativeUsers = usersBeforeStart;
+
+        while (currentDate <= endDate)
+        {
+            var nextDate = currentDate.AddDays(1);
+            var newUsersOnDate = allUsers.Count(u => u.CreatedAt >= currentDate && u.CreatedAt < nextDate);
+            cumulativeUsers += newUsersOnDate;
+
+            stats.Add(new UserGrowthStatsDto
+            {
+                Date = currentDate,
+                NewUsers = newUsersOnDate,
+                CumulativeUsers = cumulativeUsers
+            });
+
+            currentDate = nextDate;
+        }
+
+        return stats;
+    }
+
+    public async Task<Dictionary<int, int>> GetSessionCountByUserAsync(DateTime? startDate = null, DateTime? endDate = null)
+    {
+        var query = _context.ChatSessions.AsQueryable();
+
+        if (startDate.HasValue)
+            query = query.Where(s => s.CreatedAt >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(s => s.CreatedAt < endDate.Value);
+
+        var result = await query
+            .GroupBy(s => s.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
+        return result;
+    }
 }
+

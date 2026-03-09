@@ -256,6 +256,91 @@ public class AdminService : IAdminService
 
     #endregion
 
+    #region Time Series Statistics
+
+    public async Task<List<TimeSeriesStatsDto>> GetTimeSeriesStatsAsync(TimeGrouping grouping, int days = 30)
+    {
+        var startDate = DateTime.UtcNow.Date.AddDays(-days);
+        var endDate = DateTime.UtcNow.Date;
+
+        return await _chatHistoryRepository.GetTimeSeriesStatsAsync(startDate, endDate, grouping);
+    }
+
+    public async Task<List<UserGrowthStatsDto>> GetUserGrowthStatsAsync(int days = 30)
+    {
+        var startDate = DateTime.UtcNow.Date.AddDays(-days);
+        var endDate = DateTime.UtcNow.Date;
+
+        return await _userRepository.GetUserGrowthStatsAsync(startDate, endDate);
+    }
+
+    #endregion
+
+    #region Active Users
+
+    public async Task<PagedResultDto<ActiveUserDto>> GetTopActiveUsersAsync(TopActiveUsersQueryDto query)
+    {
+        var startDate = query.StartDate ?? DateTime.UtcNow.Date.AddDays(-30);
+        var endDate = query.EndDate ?? DateTime.UtcNow.Date.AddDays(1);
+
+        // Get all users with their activity
+        var users = await _userRepository.GetAllAsync();
+        
+        // Get message counts by user
+        var messageCounts = await _chatHistoryRepository.GetMessageCountByUserAsync(startDate, endDate);
+        
+        // Get session counts by user
+        var sessionCounts = await _userRepository.GetSessionCountByUserAsync(startDate, endDate);
+
+        // Build active user list
+        var activeUsers = users.Select(u => new ActiveUserDto
+        {
+            UserId = u.Id,
+            Username = u.Username,
+            Email = u.Email,
+            FullName = u.FullName,
+            TotalQuestions = messageCounts.GetValueOrDefault(u.Id, 0),
+            TotalSessions = sessionCounts.GetValueOrDefault(u.Id, 0),
+            TotalDocuments = 0, // RAG service doesn't track per-user documents in local DB
+            LastActiveAt = u.UpdatedAt
+        }).Where(u => u.TotalQuestions > 0 || u.TotalSessions > 0 || u.TotalDocuments > 0).ToList();
+
+        // Apply sorting
+        var sortedUsers = query.SortBy?.ToLower() switch
+        {
+            "totalquestions" => query.SortDescending
+                ? activeUsers.OrderByDescending(u => u.TotalQuestions)
+                : activeUsers.OrderBy(u => u.TotalQuestions),
+            "totaldocuments" => query.SortDescending
+                ? activeUsers.OrderByDescending(u => u.TotalDocuments)
+                : activeUsers.OrderBy(u => u.TotalDocuments),
+            "totalsessions" => query.SortDescending
+                ? activeUsers.OrderByDescending(u => u.TotalSessions)
+                : activeUsers.OrderBy(u => u.TotalSessions),
+            _ => query.SortDescending
+                ? activeUsers.OrderByDescending(u => u.TotalQuestions)
+                : activeUsers.OrderBy(u => u.TotalQuestions)
+        };
+
+        var totalCount = sortedUsers.Count();
+
+        // Apply pagination
+        var items = sortedUsers
+            .Skip((query.PageNumber - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .ToList();
+
+        return new PagedResultDto<ActiveUserDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            PageNumber = query.PageNumber,
+            PageSize = query.PageSize
+        };
+    }
+
+    #endregion
+
     #region Chat Session Management
 
     public async Task<PagedResultDto<AdminChatSessionDto>> GetAllChatSessionsAsync(ChatSessionQueryDto query)

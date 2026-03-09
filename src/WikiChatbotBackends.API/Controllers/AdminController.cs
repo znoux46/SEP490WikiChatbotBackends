@@ -185,6 +185,68 @@ public class AdminController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Get time series statistics (messages/sessions grouped by day/week/month)
+    /// </summary>
+    [HttpGet("stats/time-series")]
+    public async Task<ActionResult<List<TimeSeriesStatsDto>>> GetTimeSeriesStats(
+        [FromQuery] TimeGrouping grouping = TimeGrouping.Day,
+        [FromQuery] int days = 30)
+    {
+        try
+        {
+            if (days < 1 || days > 365)
+                return BadRequest(new { message = "Days must be between 1 and 365" });
+
+            var stats = await _adminService.GetTimeSeriesStatsAsync(grouping, days);
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting time series stats");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get user growth statistics over time
+    /// </summary>
+    [HttpGet("stats/user-growth")]
+    public async Task<ActionResult<List<UserGrowthStatsDto>>> GetUserGrowthStats([FromQuery] int days = 30)
+    {
+        try
+        {
+            if (days < 1 || days > 365)
+                return BadRequest(new { message = "Days must be between 1 and 365" });
+
+            var stats = await _adminService.GetUserGrowthStatsAsync(days);
+            return Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user growth stats");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get top active users
+    /// </summary>
+    [HttpGet("users/top-active")]
+    public async Task<ActionResult<PagedResultDto<ActiveUserDto>>> GetTopActiveUsers([FromQuery] TopActiveUsersQueryDto query)
+    {
+        try
+        {
+            var result = await _adminService.GetTopActiveUsersAsync(query);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting top active users");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     #endregion
 
     #region Chat Session Management

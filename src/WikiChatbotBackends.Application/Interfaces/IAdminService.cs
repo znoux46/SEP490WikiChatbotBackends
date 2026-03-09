@@ -14,6 +14,11 @@ public interface IAdminService
     // Statistics
     Task<AdminStatsDto> GetStatisticsAsync();
     Task<List<DailyStatsDto>> GetDailyStatsAsync(int days = 7);
+    Task<List<TimeSeriesStatsDto>> GetTimeSeriesStatsAsync(TimeGrouping grouping, int days = 30);
+    Task<List<UserGrowthStatsDto>> GetUserGrowthStatsAsync(int days = 30);
+
+    // Active Users
+    Task<PagedResultDto<ActiveUserDto>> GetTopActiveUsersAsync(TopActiveUsersQueryDto query);
 
     // Chat Session Management
     Task<PagedResultDto<AdminChatSessionDto>> GetAllChatSessionsAsync(ChatSessionQueryDto query);
