@@ -42,6 +42,9 @@ public static class DependencyInjection
         // RAG Service with HttpClient
         services.AddHttpClient<IRagService, RagService>();
 
+        // Wikipedia Service with HttpClient
+        services.AddHttpClient<IWikipediaService, WikipediaService>();
+
         return services;
     }
 }

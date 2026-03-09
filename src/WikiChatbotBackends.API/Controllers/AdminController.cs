@@ -345,5 +345,43 @@ public class AdminController : ControllerBase
     {
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
     }
+
+    #region Document Management - Wikipedia Import
+
+    /// <summary>
+    /// Add a document from Wikipedia by specifying a historical figure's name
+    /// </summary>
+    /// <param name="request">Request containing the name of the historical figure</param>
+    /// <returns>Information about the imported document</returns>
+    [HttpPost("documents/wikipedia")]
+    public async Task<ActionResult<AddDocumentFromWikipediaResponseDto>> AddDocumentFromWikipedia(
+        [FromBody] AddDocumentFromWikipediaRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Adding document from Wikipedia: {Name}", request.Name);
+
+            var result = await _adminService.AddDocumentFromWikipediaAsync(request);
+
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            _logger.LogInformation("Successfully added document from Wikipedia: {Title}", result.WikipediaTitle);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding document from Wikipedia: {Name}", request.Name);
+            return BadRequest(new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = $"Error importing document: {ex.Message}"
+            });
+        }
+    }
+
+    #endregion
 }
 
