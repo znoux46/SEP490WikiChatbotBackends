@@ -1,3 +1,5 @@
+
+using Microsoft.Extensions.Logging;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
@@ -9,15 +11,24 @@ public class AdminService : IAdminService
     private readonly IUserRepository _userRepository;
     private readonly IChatSessionRepository _chatSessionRepository;
     private readonly IChatHistoryRepository _chatHistoryRepository;
+    private readonly IRagService _ragService;
+    private readonly IWikipediaService _wikipediaService;
+    private readonly ILogger<AdminService> _logger;
 
     public AdminService(
         IUserRepository userRepository,
         IChatSessionRepository chatSessionRepository,
-        IChatHistoryRepository chatHistoryRepository)
+        IChatHistoryRepository chatHistoryRepository,
+        IRagService ragService,
+        IWikipediaService wikipediaService,
+        ILogger<AdminService> logger)
     {
         _userRepository = userRepository;
         _chatSessionRepository = chatSessionRepository;
         _chatHistoryRepository = chatHistoryRepository;
+        _ragService = ragService;
+        _wikipediaService = wikipediaService;
+        _logger = logger;
     }
 
     #region User Management
@@ -450,4 +461,200 @@ public class AdminService : IAdminService
     }
 
     #endregion
+
+    #region Document Management - Wikipedia Import
+
+    public async Task<AddDocumentFromWikipediaResponseDto> AddDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = "Name is required"
+            };
+        }
+
+        try
+        {
+            // Validate and set language (default to English)
+            var language = string.IsNullOrWhiteSpace(request.Language) ? "en" : request.Language.ToLower();
+            
+            // Validate supported languages
+            if (language != "en" && language != "vi")
+            {
+                return new AddDocumentFromWikipediaResponseDto
+                {
+                    Success = false,
+                    Message = "Unsupported language. Supported languages: en (English), vi (Vietnamese)"
+                };
+            }
+
+            // Step 1: Try to fetch article from Wikipedia API using the exact name first
+            WikipediaSummaryResponse? wikipediaData = null;
+            
+            // Try to detect if input is a URL
+            if (request.Name.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+                request.Name.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                // It's a URL - extract the title from the URL
+                wikipediaData = await FetchWikipediaFromUrlAsync(request.Name, language);
+            }
+            else
+            {
+                // It's a name - try exact match first, then search
+                wikipediaData = await _wikipediaService.GetArticleSummaryAsync(request.Name, language);
+                
+                // If exact match fails, try searching for similar articles
+                if (wikipediaData == null)
+                {
+                    _logger.LogInformation("Exact title not found, searching for similar articles: {Name}", request.Name);
+                    var searchResultList = await _wikipediaService.SearchAsync(request.Name, language, 10);
+                    
+                    if (searchResultList != null && searchResultList.Count > 0)
+                    {
+                        // Use the first search result to get the article
+                        var firstResult = searchResultList.First();
+                        _logger.LogInformation("Using search result: {Title}", firstResult.Title);
+                        wikipediaData = await _wikipediaService.GetArticleSummaryAsync(firstResult.Title, language);
+                    }
+                }
+            }
+            
+            // Step 2: If still not found after search, return error
+            if (wikipediaData == null)
+            {
+                return new AddDocumentFromWikipediaResponseDto
+                {
+                    Success = false,
+                    Message = $"Wikipedia article not found for: {request.Name}"
+                };
+            }
+
+            // Step 3: Create document content from Wikipedia data
+            var title = !string.IsNullOrWhiteSpace(request.CustomTitle) ? request.CustomTitle : wikipediaData.Title;
+            var content = BuildWikipediaContent(wikipediaData);
+            
+            // Step 4: Convert content to stream and upload to RAG service
+            using var memoryStream = new MemoryStream();
+            using var writer = new StreamWriter(memoryStream);
+            await writer.WriteAsync(content);
+            await writer.FlushAsync();
+            memoryStream.Position = 0;
+
+            var fileName = $"{SanitizeFileName(title)}.txt";
+            var uploadResponse = await _ragService.UploadDocumentAsync(
+                memoryStream, 
+                fileName, 
+                request.ChunkSize, 
+                request.ChunkOverlap);
+
+            // Step 5: Return success response
+            var documentId = uploadResponse.Results.FirstOrDefault()?.DocumentId;
+            var jobId = uploadResponse.Results.FirstOrDefault()?.JobId;
+
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = true,
+                Message = "Document imported successfully from Wikipedia",
+                DocumentId = documentId,
+                JobId = jobId,
+                WikipediaTitle = wikipediaData.Title,
+                WikipediaExtract = wikipediaData.Extract,
+                WikipediaUrl = wikipediaData.ContentUrls?.Desktop?.Page
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = $"Failed to connect to Wikipedia: {ex.Message}"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = $"Error importing document: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<WikipediaSummaryResponse?> FetchWikipediaFromUrlAsync(string url, string language)
+    {
+        try
+        {
+            // Extract title from URL
+            // URL format: https://vi.wikipedia.org/wiki/Phạm_Ngũ_Lão
+            var uri = new Uri(url);
+            var path = uri.AbsolutePath;
+            
+            if (path.StartsWith("/wiki/"))
+            {
+                var title = path.Substring(6); // Remove "/wiki/"
+                title = Uri.UnescapeDataString(title.Replace("_", " "));
+                
+                _logger.LogInformation("Extracted title from URL: {Title}", title);
+                return await _wikipediaService.GetArticleSummaryAsync(title, language);
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error extracting title from URL: {Url}", url);
+            return null;
+        }
+    }
+
+    private string BuildWikipediaContent(WikipediaSummaryResponse wikiData)
+    {
+        var sb = new System.Text.StringBuilder();
+        
+        // Add title
+        sb.AppendLine($"# {wikiData.Title}");
+        sb.AppendLine();
+
+        // Add description if available
+        if (!string.IsNullOrWhiteSpace(wikiData.Description))
+        {
+            sb.AppendLine($"## {wikiData.Description}");
+            sb.AppendLine();
+        }
+
+        // Add main content/extract
+        if (!string.IsNullOrWhiteSpace(wikiData.Extract))
+        {
+            sb.AppendLine("## Content");
+            sb.AppendLine();
+            sb.AppendLine(wikiData.Extract);
+            sb.AppendLine();
+        }
+
+        // Add metadata
+        sb.AppendLine("## Metadata");
+        sb.AppendLine();
+        if (!string.IsNullOrWhiteSpace(wikiData.Timestamp))
+        {
+            sb.AppendLine($"- Last modified: {wikiData.Timestamp}");
+        }
+        if (wikiData.ContentUrls?.Desktop?.Page != null)
+        {
+            sb.AppendLine($"- Wikipedia URL: {wikiData.ContentUrls.Desktop.Page}");
+        }
+
+        return sb.ToString();
+    }
+
+    private string SanitizeFileName(string fileName)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(fileName.Where(c => !invalidChars.Contains(c)).ToArray());
+        return sanitized.Replace(" ", "_");
+    }
+
+    #endregion
 }
+

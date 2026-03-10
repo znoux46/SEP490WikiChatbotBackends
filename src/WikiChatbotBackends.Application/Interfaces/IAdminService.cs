@@ -25,5 +25,8 @@ public interface IAdminService
     Task<AdminChatSessionDto?> GetChatSessionByIdAsync(int sessionId);
     Task<bool> DeleteChatSessionAsync(int sessionId);
     Task<bool> DeleteAllUserChatSessionsAsync(int userId);
+
+    // Document Management - Wikipedia Import
+    Task<AddDocumentFromWikipediaResponseDto> AddDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
 }
 

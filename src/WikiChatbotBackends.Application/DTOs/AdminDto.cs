@@ -141,3 +141,121 @@ public class TopActiveUsersQueryDto
     public DateTime? EndDate { get; set; }
 }
 
+#region Wikipedia Document Import
+
+/// <summary>
+/// Request DTO for adding a document from Wikipedia
+/// </summary>
+public class AddDocumentFromWikipediaRequestDto
+{
+    /// <summary>
+    /// The name of the historical figure OR Wikipedia URL to import
+    /// Example: "Phạm Ngũ Lão" or "https://vi.wikipedia.org/wiki/Phạm_Ngũ_Lão"
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional: Custom title for the document (defaults to Wikipedia title)
+    /// </summary>
+    public string? CustomTitle { get; set; }
+
+    /// <summary>
+    /// Chunk size for document processing (default: 800)
+    /// </summary>
+    public int ChunkSize { get; set; } = 800;
+
+    /// <summary>
+    /// Chunk overlap for document processing (default: 150)
+    /// </summary>
+    public int ChunkOverlap { get; set; } = 150;
+
+    /// <summary>
+    /// Language code for Wikipedia (default: en, supports: en, vi)
+    /// </summary>
+    public string Language { get; set; } = "en";
+}
+
+/// <summary>
+/// Response DTO for Wikipedia document import
+/// </summary>
+public class AddDocumentFromWikipediaResponseDto
+{
+    /// <summary>
+    /// Whether the import was successful
+    /// </summary>
+    public bool Success { get; set; }
+
+    /// <summary>
+    /// Message describing the result
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The document ID from RAG service (if successful)
+    /// </summary>
+    public string? DocumentId { get; set; }
+
+    /// <summary>
+    /// The job ID for tracking processing status
+    /// </summary>
+    public string? JobId { get; set; }
+
+    /// <summary>
+    /// Title of the Wikipedia article
+    /// </summary>
+    public string? WikipediaTitle { get; set; }
+
+    /// <summary>
+    /// Extract/summary from Wikipedia
+    /// </summary>
+    public string? WikipediaExtract { get; set; }
+
+    /// <summary>
+    /// URL to the Wikipedia article
+    /// </summary>
+    public string? WikipediaUrl { get; set; }
+
+    /// <summary>
+    /// Search results when exact title is not found
+    /// </summary>
+    public List<WikipediaSearchResult>? SearchResults { get; set; }
+}
+
+/// <summary>
+/// Response from Wikipedia REST API Summary endpoint
+/// </summary>
+public class WikipediaSummaryResponse
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string Extract { get; set; } = string.Empty;
+    public string? Timestamp { get; set; }
+    public WikipediaContentUrls? ContentUrls { get; set; }
+}
+
+public class WikipediaContentUrls
+{
+    public WikipediaUrlInfo? Desktop { get; set; }
+    public WikipediaUrlInfo? Mobile { get; set; }
+}
+
+public class WikipediaUrlInfo
+{
+    public string? Page { get; set; }
+    public string? Revisions { get; set; }
+    public string? Edit { get; set; }
+    public string? Talk { get; set; }
+}
+
+/// <summary>
+/// Search result from Wikipedia API
+/// </summary>
+public class WikipediaSearchResult
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? Thumbnail { get; set; }
+}
+
+#endregion
+
