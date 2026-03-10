@@ -149,7 +149,8 @@ public class TopActiveUsersQueryDto
 public class AddDocumentFromWikipediaRequestDto
 {
     /// <summary>
-    /// The name of the historical figure to search on Wikipedia
+    /// The name of the historical figure OR Wikipedia URL to import
+    /// Example: "Phạm Ngũ Lão" or "https://vi.wikipedia.org/wiki/Phạm_Ngũ_Lão"
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
@@ -167,6 +168,11 @@ public class AddDocumentFromWikipediaRequestDto
     /// Chunk overlap for document processing (default: 150)
     /// </summary>
     public int ChunkOverlap { get; set; } = 150;
+
+    /// <summary>
+    /// Language code for Wikipedia (default: en, supports: en, vi)
+    /// </summary>
+    public string Language { get; set; } = "en";
 }
 
 /// <summary>
@@ -208,6 +214,11 @@ public class AddDocumentFromWikipediaResponseDto
     /// URL to the Wikipedia article
     /// </summary>
     public string? WikipediaUrl { get; set; }
+
+    /// <summary>
+    /// Search results when exact title is not found
+    /// </summary>
+    public List<WikipediaSearchResult>? SearchResults { get; set; }
 }
 
 /// <summary>
@@ -234,6 +245,16 @@ public class WikipediaUrlInfo
     public string? Revisions { get; set; }
     public string? Edit { get; set; }
     public string? Talk { get; set; }
+}
+
+/// <summary>
+/// Search result from Wikipedia API
+/// </summary>
+public class WikipediaSearchResult
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? Thumbnail { get; set; }
 }
 
 #endregion

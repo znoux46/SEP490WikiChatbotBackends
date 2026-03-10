@@ -42,8 +42,8 @@ public static class DependencyInjection
         // RAG Service with HttpClient
         services.AddHttpClient<IRagService, RagService>();
 
-        // Wikipedia Service with HttpClient
-        services.AddHttpClient<IWikipediaService, WikipediaService>();
+        // Wikipedia Service - using direct HttpClient creation to avoid reuse issues
+        services.AddScoped<IWikipediaService, WikipediaService>();
 
         return services;
     }
