@@ -28,5 +28,8 @@ public interface IAdminService
 
     // Document Management - Wikipedia Import
     Task<AddDocumentFromWikipediaResponseDto> AddDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
+    
+    // Document Management - Wikipedia Edit
+    Task<AddDocumentFromWikipediaResponseDto> EditDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
 }
 

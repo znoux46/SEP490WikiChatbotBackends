@@ -382,6 +382,40 @@ public class AdminController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Edit a document from Wikipedia - hard deletes old document and chunks, then re-imports fresh content
+    /// </summary>
+    /// <param name="request">Same request format as AddDocumentFromWikipedia</param>
+    /// <returns>Same response format as AddDocumentFromWikipedia</returns>
+    [HttpPost("documents/wikipedia/edit")]
+    public async Task<ActionResult<AddDocumentFromWikipediaResponseDto>> EditDocumentFromWikipedia(
+        [FromBody] AddDocumentFromWikipediaRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Editing document from Wikipedia: {Name}", request.Name);
+
+            var result = await _adminService.EditDocumentFromWikipediaAsync(request);
+
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            _logger.LogInformation("Successfully edited document from Wikipedia: {Title}", result.WikipediaTitle);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error editing document from Wikipedia: {Name}", request.Name);
+            return BadRequest(new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = $"Error updating document: {ex.Message}"
+            });
+        }
+    }
+
     #endregion
 }
 
