@@ -57,7 +57,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(
                 "https://wikichatboxfe-hvabggc9hkdnh6fu.japanwest-01.azurewebsites.net",
-                "https://wikichatboxai.xyz"
+                "https://wikichatboxai.xyz",
+                "http://localhost:3000"
               )
               .AllowAnyMethod()
               .AllowAnyHeader()
