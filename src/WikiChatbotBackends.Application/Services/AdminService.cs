@@ -656,5 +656,145 @@ public class AdminService : IAdminService
     }
 
     #endregion
+
+    #region Document Management - Wikipedia Edit
+
+    public async Task<AddDocumentFromWikipediaResponseDto> EditDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = "Name is required"
+            };
+        }
+
+        try
+        {
+            // Validate and set language (default to English)
+            var language = string.IsNullOrWhiteSpace(request.Language) ? "en" : request.Language.ToLower();
+            
+            // Validate supported languages
+            if (language != "en" && language != "vi")
+            {
+                return new AddDocumentFromWikipediaResponseDto
+                {
+                    Success = false,
+                    Message = "Unsupported language. Supported languages: en (English), vi (Vietnamese)"
+                };
+            }
+
+            // Step 1: Fetch fresh Wikipedia article (same as Add)
+            WikipediaSummaryResponse? wikipediaData = null;
+            
+            if (request.Name.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+                request.Name.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                wikipediaData = await FetchWikipediaFromUrlAsync(request.Name, language);
+            }
+            else
+            {
+                wikipediaData = await _wikipediaService.GetArticleSummaryAsync(request.Name, language);
+                
+                if (wikipediaData == null)
+                {
+                    _logger.LogInformation("Exact title not found, searching for similar articles: {Name}", request.Name);
+                    var searchResultList = await _wikipediaService.SearchAsync(request.Name, language, 10);
+                    
+                    if (searchResultList != null && searchResultList.Count > 0)
+                    {
+                        var firstResult = searchResultList.First();
+                        _logger.LogInformation("Using search result: {Title}", firstResult.Title);
+                        wikipediaData = await _wikipediaService.GetArticleSummaryAsync(firstResult.Title, language);
+                    }
+                }
+            }
+            
+            if (wikipediaData == null)
+            {
+                return new AddDocumentFromWikipediaResponseDto
+                {
+                    Success = false,
+                    Message = $"Wikipedia article not found for: {request.Name}"
+                };
+            }
+
+            // Step 2: Determine filename and check for existing document
+            var title = !string.IsNullOrWhiteSpace(request.CustomTitle) ? request.CustomTitle : wikipediaData.Title;
+            var fileName = $"{SanitizeFileName(title)}.txt";
+
+            // Hard delete existing document + chunks if exists (no version check)
+            var existingDocs = await _ragService.GetDocumentsAsync(0, 1000);
+            var existingDoc = existingDocs.FirstOrDefault(d => 
+                string.Equals(d.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
+            if (existingDoc != null)
+            {
+                _logger.LogInformation("Found existing document {DocId} ({FileName}), hard deleting...", existingDoc.Id, fileName);
+                var deleted = await _ragService.DeleteDocumentAsync(existingDoc.Id);
+                if (deleted)
+                {
+                    _logger.LogInformation("Successfully deleted old document {DocId} and its chunks", existingDoc.Id);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to delete old document {DocId}, proceeding with new upload", existingDoc.Id);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("No existing document found for {FileName}, creating new", fileName);
+            }
+
+            // Step 3: Build fresh content and upload new document
+            var content = BuildWikipediaContent(wikipediaData);
+            
+            using var memoryStream = new MemoryStream();
+            using var writer = new StreamWriter(memoryStream);
+            await writer.WriteAsync(content);
+            await writer.FlushAsync();
+            memoryStream.Position = 0;
+
+            var uploadResponse = await _ragService.UploadDocumentAsync(
+                memoryStream, 
+                fileName, 
+                request.ChunkSize, 
+                request.ChunkOverlap);
+
+            // Step 4: Return success
+            var documentId = uploadResponse.Results.FirstOrDefault()?.DocumentId;
+            var jobId = uploadResponse.Results.FirstOrDefault()?.JobId;
+
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = true,
+                Message = "Document updated successfully from Wikipedia (old version and chunks hard-deleted)",
+                DocumentId = documentId,
+                JobId = jobId,
+                WikipediaTitle = wikipediaData.Title,
+                WikipediaExtract = wikipediaData.Extract,
+                WikipediaUrl = wikipediaData.ContentUrls?.Desktop?.Page
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = $"Failed to connect to Wikipedia: {ex.Message}"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AddDocumentFromWikipediaResponseDto
+            {
+                Success = false,
+                Message = $"Error updating document: {ex.Message}"
+            };
+        }
+    }
+
+    #endregion
 }
 
