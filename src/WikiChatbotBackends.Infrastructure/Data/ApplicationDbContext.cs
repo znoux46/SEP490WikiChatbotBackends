@@ -33,14 +33,12 @@ public class ApplicationDbContext : DbContext
         // ChatSession configuration (Head table)
         modelBuilder.Entity<ChatSession>(entity =>
         {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.SessionId).IsRequired().HasMaxLength(100);
+            entity.HasKey(e => e.SessionId);
             entity.Property(e => e.SessionName).IsRequired().HasMaxLength(200);
             entity.HasOne(e => e.User)
                 .WithMany(u => u.ChatSessions)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => e.SessionId).IsUnique(); // SessionId phải unique
             entity.HasIndex(e => e.UserId);
         });
 

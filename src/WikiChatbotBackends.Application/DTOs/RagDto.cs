@@ -14,17 +14,14 @@ namespace WikiChatbotBackends.Application.DTOs
         [JsonPropertyName("question")]
         public string Question { get; set; } = string.Empty;
 
-        [JsonPropertyName("document_ids")]
-        public List<string>? DocumentIds { get; set; }
-
-        [JsonPropertyName("verbose")]
-        [DefaultValue(false)]
-        public bool Verbose { get; set; } = false;
+        [JsonPropertyName("SessionId")]
+        public Guid SessionId { get; set; }
     }
 
     public class ChatResponse
     {
         public string Question { get; set; } = string.Empty;
+        public string SessionId { get; set; } = string.Empty;
         public string Answer { get; set; } = string.Empty;
         public Dictionary<string, object>? Metadata { get; set; }
     }

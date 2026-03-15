@@ -401,10 +401,9 @@ public class AdminService : IAdminService
             .Take(query.PageSize)
             .Select(s => new AdminChatSessionDto
             {
-                Id = s.Id,
                 UserId = s.UserId,
                 Username = s.User?.Username ?? "Unknown",
-                SessionId = s.SessionId,
+                SessionId = s.SessionId.ToString(),
                 SessionName = s.SessionName,
                 MessageCount = s.ChatHistories?.Count ?? 0,
                 CreatedAt = s.CreatedAt,
@@ -421,17 +420,16 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<AdminChatSessionDto?> GetChatSessionByIdAsync(int sessionId)
+    public async Task<AdminChatSessionDto?> GetChatSessionByIdAsync(Guid sessionId)
     {
         var session = await _chatSessionRepository.GetChatSessionWithUserAsync(sessionId);
         if (session == null) return null;
 
         return new AdminChatSessionDto
         {
-            Id = session.Id,
             UserId = session.UserId,
             Username = session.User?.Username ?? "Unknown",
-            SessionId = session.SessionId,
+            SessionId = session.SessionId.ToString(),
             SessionName = session.SessionName,
             MessageCount = session.ChatHistories?.Count ?? 0,
             CreatedAt = session.CreatedAt,
@@ -439,9 +437,10 @@ public class AdminService : IAdminService
         };
     }
 
-    public async Task<bool> DeleteChatSessionAsync(int sessionId)
+    public async Task<bool> DeleteChatSessionAsync(Guid sessionId)
     {
-        var session = await _chatSessionRepository.GetByIdAsync(sessionId);
+        var sessions = await _chatSessionRepository.FindAsync(x=>x.SessionId == sessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null)
             throw new KeyNotFoundException($"Chat session with id {sessionId} not found");
 

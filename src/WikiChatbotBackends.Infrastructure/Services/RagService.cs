@@ -41,8 +41,8 @@ namespace WikiChatbotBackends.Infrastructure.Services
                 var response = await _httpClient.PostAsJsonAsync("/api/v1/chat", new
                 {
                     question = request.Question,
-                    document_ids = request.DocumentIds,
-                    verbose = request.Verbose
+                    document_ids = new List<string>(),
+                    verbose = false
                 });
 
                 response.EnsureSuccessStatusCode();

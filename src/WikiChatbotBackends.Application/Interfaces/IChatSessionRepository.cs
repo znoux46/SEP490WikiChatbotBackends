@@ -14,7 +14,7 @@ public interface IChatSessionRepository : IRepository<ChatSession>
     
     Task<int> CountChatSessionsAsync(Expression<Func<ChatSession, bool>>? predicate = null);
     
-    Task<ChatSession?> GetChatSessionWithUserAsync(int sessionId);
+    Task<ChatSession?> GetChatSessionWithUserAsync(Guid sessionId);
     
     Task<int> GetNewChatSessionsCountAsync(DateTime startDate, DateTime endDate);
     

@@ -273,7 +273,7 @@ public class AdminController : ControllerBase
     /// Get chat session by ID
     /// </summary>
     [HttpGet("chat-sessions/{sessionId}")]
-    public async Task<ActionResult<AdminChatSessionDto>> GetChatSessionById(int sessionId)
+    public async Task<ActionResult<AdminChatSessionDto>> GetChatSessionById(Guid sessionId)
     {
         try
         {
@@ -294,7 +294,7 @@ public class AdminController : ControllerBase
     /// Delete chat session
     /// </summary>
     [HttpDelete("chat-sessions/{sessionId}")]
-    public async Task<ActionResult> DeleteChatSession(int sessionId)
+    public async Task<ActionResult> DeleteChatSession(Guid sessionId)
     {
         try
         {

@@ -22,8 +22,8 @@ public interface IAdminService
 
     // Chat Session Management
     Task<PagedResultDto<AdminChatSessionDto>> GetAllChatSessionsAsync(ChatSessionQueryDto query);
-    Task<AdminChatSessionDto?> GetChatSessionByIdAsync(int sessionId);
-    Task<bool> DeleteChatSessionAsync(int sessionId);
+    Task<AdminChatSessionDto?> GetChatSessionByIdAsync(Guid sessionId);
+    Task<bool> DeleteChatSessionAsync(Guid sessionId);
     Task<bool> DeleteAllUserChatSessionsAsync(int userId);
 
     // Document Management - Wikipedia Import
