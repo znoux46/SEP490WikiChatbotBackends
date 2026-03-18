@@ -2,8 +2,8 @@ namespace WikiChatbotBackends.Application.DTOs;
 
 public class ChatHistoryDto
 {
-    public int Id { get; set; }
-    public int SessionId { get; set; }
+    public Guid Id { get; set; }
+    public Guid SessionId { get; set; }
     public string Question { get; set; } = string.Empty;
     public string Answer { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
@@ -11,7 +11,7 @@ public class ChatHistoryDto
 
 public class CreateChatHistoryDto
 {
-    public int SessionId { get; set; }
+    public Guid SessionId { get; set; }
     public string Question { get; set; } = string.Empty;
     public string Answer { get; set; } = string.Empty;
 }
@@ -24,8 +24,7 @@ public class UpdateChatHistoryDto
 
 public class ChatSessionDto
 {
-    public int Id { get; set; }
-    public string SessionId { get; set; } = string.Empty;
+    public Guid SessionId { get; set; }
     public string SessionName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -33,7 +32,7 @@ public class ChatSessionDto
 
 public class CreateChatSessionDto
 {
-    public string SessionId { get; set; } = string.Empty; // GUID
+    public Guid SessionId { get; set; }
     public string SessionName { get; set; } = string.Empty;
 }
 
@@ -44,8 +43,7 @@ public class UpdateChatSessionDto
 
 public class SessionSummaryDto
 {
-    public int Id { get; set; }
-    public string SessionId { get; set; } = string.Empty;
+    public Guid SessionId { get; set; }
     public string SessionName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime LastMessageAt { get; set; }

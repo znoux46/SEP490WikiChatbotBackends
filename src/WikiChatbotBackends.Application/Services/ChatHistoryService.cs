@@ -28,7 +28,6 @@ public class ChatHistoryService : IChatHistoryService
         
         return sessions.Select(session => new SessionSummaryDto
         {
-            Id = session.Id,
             SessionId = session.SessionId,
             SessionName = session.SessionName,
             CreatedAt = session.CreatedAt,
@@ -39,15 +38,15 @@ public class ChatHistoryService : IChatHistoryService
         }).OrderByDescending(s => s.LastMessageAt);
     }
 
-    public async Task<ChatSessionDto> GetSessionByIdAsync(int userId, int sessionId)
+    public async Task<ChatSessionDto> GetSessionByIdAsync(int userId, Guid sessionId)
     {
-        var session = await _sessionRepository.GetByIdAsync(sessionId);
+        var sessions = await _sessionRepository.FindAsync(x => x.SessionId == sessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new KeyNotFoundException($"Session with id {sessionId} not found");
 
         return new ChatSessionDto
         {
-            Id = session.Id,
             SessionId = session.SessionId,
             SessionName = session.SessionName,
             CreatedAt = session.CreatedAt,
@@ -69,7 +68,6 @@ public class ChatHistoryService : IChatHistoryService
         var created = await _sessionRepository.AddAsync(session);
         return new ChatSessionDto
         {
-            Id = created.Id,
             SessionId = created.SessionId,
             SessionName = created.SessionName,
             CreatedAt = created.CreatedAt,
@@ -77,9 +75,10 @@ public class ChatHistoryService : IChatHistoryService
         };
     }
 
-    public async Task<ChatSessionDto> UpdateSessionAsync(int userId, int sessionId, UpdateChatSessionDto dto)
+    public async Task<ChatSessionDto> UpdateSessionAsync(int userId, Guid sessionId, UpdateChatSessionDto dto)
     {
-        var session = await _sessionRepository.GetByIdAsync(sessionId);
+        var sessions = await _sessionRepository.FindAsync(x=>x.SessionId==sessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new KeyNotFoundException($"Session with id {sessionId} not found");
 
@@ -89,7 +88,6 @@ public class ChatHistoryService : IChatHistoryService
         await _sessionRepository.UpdateAsync(session);
         return new ChatSessionDto
         {
-            Id = session.Id,
             SessionId = session.SessionId,
             SessionName = session.SessionName,
             CreatedAt = session.CreatedAt,
@@ -97,9 +95,10 @@ public class ChatHistoryService : IChatHistoryService
         };
     }
 
-    public async Task DeleteSessionAsync(int userId, int sessionId)
+    public async Task DeleteSessionAsync(int userId, Guid sessionId)
     {
-        var session = await _sessionRepository.GetByIdAsync(sessionId);
+        var sessions = await _sessionRepository.FindAsync(x=>x.SessionId== sessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new KeyNotFoundException($"Session with id {sessionId} not found");
 
@@ -119,7 +118,7 @@ public class ChatHistoryService : IChatHistoryService
         foreach (var session in sessions)
         {
             // Xóa histories trước
-            var histories = await _chatHistoryRepository.FindAsync(ch => ch.SessionId == session.Id);
+            var histories = await _chatHistoryRepository.FindAsync(ch => ch.SessionId == session.SessionId);
             foreach (var history in histories)
             {
                 await _chatHistoryRepository.DeleteAsync(history);
@@ -129,10 +128,11 @@ public class ChatHistoryService : IChatHistoryService
     }
 
     // History methods
-    public async Task<IEnumerable<ChatHistoryDto>> GetSessionHistoryAsync(int userId, int sessionId)
+    public async Task<IEnumerable<ChatHistoryDto>> GetSessionHistoryAsync(int userId, Guid sessionId)
     {
         // Verify session belongs to user
-        var session = await _sessionRepository.GetByIdAsync(sessionId);
+        var sessions = await _sessionRepository.FindAsync(x=>x.SessionId==sessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new KeyNotFoundException($"Session with id {sessionId} not found");
 
@@ -150,7 +150,8 @@ public class ChatHistoryService : IChatHistoryService
     public async Task<ChatHistoryDto> CreateChatHistoryAsync(int userId, CreateChatHistoryDto dto)
     {
         // Verify session belongs to user
-        var session = await _sessionRepository.GetByIdAsync(dto.SessionId);
+        var sessions = await _sessionRepository.FindAsync(x => x.SessionId == dto.SessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new KeyNotFoundException($"Session with id {dto.SessionId} not found");
 
@@ -186,7 +187,8 @@ public class ChatHistoryService : IChatHistoryService
             throw new KeyNotFoundException($"Chat history with id {historyId} not found");
 
         // Verify session belongs to user
-        var session = await _sessionRepository.GetByIdAsync(history.SessionId);
+        var sessions = await _sessionRepository.FindAsync(x => x.SessionId == history.SessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new UnauthorizedAccessException("You don't have permission to update this history");
 
@@ -212,7 +214,8 @@ public class ChatHistoryService : IChatHistoryService
             throw new KeyNotFoundException($"Chat history with id {historyId} not found");
 
         // Verify session belongs to user
-        var session = await _sessionRepository.GetByIdAsync(history.SessionId);
+        var sessions = await _sessionRepository.FindAsync(x => x.SessionId == history.SessionId);
+        var session = sessions.FirstOrDefault();
         if (session == null || session.UserId != userId)
             throw new UnauthorizedAccessException("You don't have permission to delete this history");
 
@@ -222,10 +225,10 @@ public class ChatHistoryService : IChatHistoryService
     /// <summary>
     /// Tự động lấy thông tin từ HttpContext để lưu lịch sử Chat
     /// </summary>
-    public async Task SaveChatHistoryWithContextAsync(string question, string answer)
+    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer, Guid sessionId)
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext == null) return;
+        if (httpContext == null) return string.Empty;
 
         // 1. Lấy UserId từ Claims (nếu không có thì mặc định là 0 hoặc xử lý tùy ý)
         var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -239,14 +242,11 @@ public class ChatHistoryService : IChatHistoryService
         try
         {
             // 2. Lấy SessionId (GUID string) từ Header hoặc tạo mới
-            var sessionIdString = httpContext.Request.Headers["X-Session-Id"].FirstOrDefault()
-                                  ?? Guid.NewGuid().ToString();
+            var sessionIdString = sessionId!=Guid.Empty ? sessionId: Guid.NewGuid();
 
             // 3. Tìm hoặc tạo Session dựa trên SessionId (string) và UserId
             var sessions = await _sessionRepository.FindAsync(s => s.UserId == userId && s.SessionId == sessionIdString);
             var session = sessions.FirstOrDefault();
-
-            int internalSessionId;
 
             if (session == null)
             {
@@ -260,17 +260,18 @@ public class ChatHistoryService : IChatHistoryService
                     UpdatedAt = DateTime.UtcNow
                 };
                 var created = await _sessionRepository.AddAsync(newSession);
-                internalSessionId = created.Id;
             }
             else
             {
-                internalSessionId = session.Id;
+                // Cập nhật thời gian cho Session
+                session.UpdatedAt = DateTime.UtcNow;
+                await _sessionRepository.UpdateAsync(session);
             }
 
             // 4. Lưu vào ChatHistory
             var history = new ChatHistory
             {
-                SessionId = internalSessionId,
+                SessionId = sessionIdString,
                 Question = question,
                 Answer = answer,
                 CreatedAt = DateTime.UtcNow,
@@ -279,17 +280,13 @@ public class ChatHistoryService : IChatHistoryService
 
             await _chatHistoryRepository.AddAsync(history);
 
-            // Cập nhật thời gian cho Session
-            if (session != null)
-            {
-                session.UpdatedAt = DateTime.UtcNow;
-                await _sessionRepository.UpdateAsync(session);
-            }
+            return sessionIdString.ToString(); // Trả về SessionId để client có thể sử dụng cho các lần gọi tiếp theo
         }
         catch (Exception ex)
         {
             // Log lỗi nhưng không làm gián đoạn luồng trả lời của AI
             // _logger.LogError(ex, "Failed to save history in service");
+            return string.Empty;
         }
     }
 }

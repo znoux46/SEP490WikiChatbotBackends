@@ -31,7 +31,7 @@ public class HistoryController : ControllerBase
     }
 
     [HttpGet("sessions/{sessionId}")]
-    public async Task<ActionResult<ChatSessionDto>> GetSession(int sessionId)
+    public async Task<ActionResult<ChatSessionDto>> GetSession(Guid sessionId)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
@@ -58,7 +58,7 @@ public class HistoryController : ControllerBase
         try
         {
             var session = await _chatHistoryService.CreateSessionAsync(userId, dto);
-            return CreatedAtAction(nameof(GetSession), new { sessionId = session.Id }, session);
+            return CreatedAtAction(nameof(GetSession), new { sessionId = session.SessionId }, session);
         }
         catch (Exception ex)
         {
@@ -67,7 +67,7 @@ public class HistoryController : ControllerBase
     }
 
     [HttpPut("sessions/{sessionId}")]
-    public async Task<ActionResult<ChatSessionDto>> UpdateSession(int sessionId, [FromBody] UpdateChatSessionDto dto)
+    public async Task<ActionResult<ChatSessionDto>> UpdateSession(Guid sessionId, [FromBody] UpdateChatSessionDto dto)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
@@ -89,7 +89,7 @@ public class HistoryController : ControllerBase
     }
 
     [HttpDelete("sessions/{sessionId}")]
-    public async Task<IActionResult> DeleteSession(int sessionId)
+    public async Task<IActionResult> DeleteSession(Guid sessionId)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
@@ -130,7 +130,7 @@ public class HistoryController : ControllerBase
 
     // History endpoints
     [HttpGet("sessions/{sessionId}/messages")]
-    public async Task<ActionResult<IEnumerable<ChatHistoryDto>>> GetSessionHistory(int sessionId)
+    public async Task<ActionResult<IEnumerable<ChatHistoryDto>>> GetSessionHistory(Guid sessionId)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))

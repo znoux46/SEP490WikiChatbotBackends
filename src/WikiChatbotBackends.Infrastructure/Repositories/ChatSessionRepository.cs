@@ -49,11 +49,11 @@ public class ChatSessionRepository : Repository<ChatSession>, IChatSessionReposi
         return await query.CountAsync();
     }
 
-    public async Task<ChatSession?> GetChatSessionWithUserAsync(int sessionId)
+    public async Task<ChatSession?> GetChatSessionWithUserAsync(Guid sessionId)
     {
         return await _dbSet
             .Include(s => s.User)
-            .FirstOrDefaultAsync(s => s.Id == sessionId);
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
     }
 
     public async Task<int> GetNewChatSessionsCountAsync(DateTime startDate, DateTime endDate)

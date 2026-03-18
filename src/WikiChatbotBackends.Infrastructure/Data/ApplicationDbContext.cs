@@ -12,6 +12,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<ChatSession> ChatSessions { get; set; }
     public DbSet<ChatHistory> ChatHistories { get; set; }
+    
+    public DbSet<Category> Categories { get; set; }
+    public DbSet<Detail> Details { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,14 +36,12 @@ public class ApplicationDbContext : DbContext
         // ChatSession configuration (Head table)
         modelBuilder.Entity<ChatSession>(entity =>
         {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.SessionId).IsRequired().HasMaxLength(100);
+            entity.HasKey(e => e.SessionId);
             entity.Property(e => e.SessionName).IsRequired().HasMaxLength(200);
             entity.HasOne(e => e.User)
                 .WithMany(u => u.ChatSessions)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => e.SessionId).IsUnique(); // SessionId phải unique
             entity.HasIndex(e => e.UserId);
         });
 
@@ -55,6 +56,30 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(e => e.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => e.SessionId);
+        });
+
+        // Category configuration
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.HasIndex(e => e.Name);
+        });
+
+        // Detail configuration
+        modelBuilder.Entity<Detail>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.Content).HasColumnType("text");
+            entity.Property(e => e.WikipediaUrl).HasMaxLength(500);
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Details)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.CategoryId);
+            entity.HasIndex(e => e.Title);
         });
     }
 }
