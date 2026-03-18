@@ -12,11 +12,15 @@ namespace WikiChatbotBackends.API.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
+    private readonly ICategoryService _categoryService;
+    private readonly IDetailService _detailService;
     private readonly ILogger<AdminController> _logger;
 
-    public AdminController(IAdminService adminService, ILogger<AdminController> logger)
+    public AdminController(IAdminService adminService, ICategoryService categoryService, IDetailService detailService, ILogger<AdminController> logger)
     {
         _adminService = adminService;
+        _categoryService = categoryService;
+        _detailService = detailService;
         _logger = logger;
     }
 
@@ -330,6 +334,206 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting all chat sessions for user {UserId}", userId);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region Category Management
+
+    /// <summary>
+    /// Get all categories for admin
+    /// </summary>
+    [HttpGet("categories")]
+    public async Task<ActionResult<List<CategoryDto>>> GetCategories()
+    {
+        try
+        {
+            var categories = await _categoryService.GetAllAsync();
+            return Ok(categories);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting categories");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Create new category
+    /// </summary>
+    [HttpPost("categories")]
+    public async Task<ActionResult<Guid>> CreateCategory([FromBody] CreateCategoryDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                return BadRequest(new { message = "Name is required" });
+
+            var id = await _categoryService.CreateAsync(dto);
+            return Ok(new { id, message = "Category created successfully" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating category");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Update category
+    /// </summary>
+    [HttpPut("categories/{id}")]
+    public async Task<ActionResult> UpdateCategory(Guid id, [FromBody] UpdateCategoryDto dto)
+    {
+        try
+        {
+            await _categoryService.UpdateAsync(id, dto);
+            return Ok(new { message = "Category updated successfully" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating category {Id}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete category
+    /// </summary>
+    [HttpDelete("categories/{id}")]
+    public async Task<ActionResult> DeleteCategory(Guid id)
+    {
+        try
+        {
+            await _categoryService.DeleteAsync(id);
+            return Ok(new { message = "Category deleted successfully" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting category {Id}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region Detail Management
+
+    /// <summary>
+    /// Get all details for admin (temporary - use category/details later)
+    /// </summary>
+    [HttpGet("details")]
+    public async Task<ActionResult<List<DetailDto>>> GetDetails()
+    {
+        try
+        {
+            var categories = await _categoryService.GetAllAsync();
+            var allDetails = new List<DetailDto>();
+            foreach (var cat in categories)
+            {
+                var details = await _detailService.GetByCategoryIdAsync(cat.Id);
+                allDetails.AddRange(details);
+            }
+            return Ok(allDetails);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting details");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Create new detail
+    /// </summary>
+    [HttpPost("details")]
+    public async Task<ActionResult<Guid>> CreateDetail([FromBody] CreateDetailDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Title))
+                return BadRequest(new { message = "Title is required" });
+
+            var id = await _detailService.CreateAsync(dto);
+            return Ok(new { id, message = "Detail created successfully" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating detail");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Update detail
+    /// </summary>
+    [HttpPut("details/{id}")]
+    public async Task<ActionResult> UpdateDetail(Guid id, [FromBody] UpdateDetailDto dto)
+    {
+        try
+        {
+            await _detailService.UpdateAsync(id, dto);
+            return Ok(new { message = "Detail updated successfully" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating detail {Id}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete detail
+    /// </summary>
+    [HttpDelete("details/{id}")]
+    public async Task<ActionResult> DeleteDetail(Guid id)
+    {
+        try
+        {
+            await _detailService.DeleteAsync(id);
+            return Ok(new { message = "Detail deleted successfully" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting detail {Id}", id);
             return BadRequest(new { message = ex.Message });
         }
     }

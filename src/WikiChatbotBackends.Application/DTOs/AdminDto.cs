@@ -141,6 +141,33 @@ public class TopActiveUsersQueryDto
     public DateTime? EndDate { get; set; }
 }
 
+public class CreateCategoryDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+}
+
+public class UpdateCategoryDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+}
+
+public class CreateDetailDto
+{
+    public Guid CategoryId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string? WikipediaUrl { get; set; }
+}
+
+public class UpdateDetailDto
+{
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string? WikipediaUrl { get; set; }
+}
+
 #region Wikipedia Document Import
 
 /// <summary>

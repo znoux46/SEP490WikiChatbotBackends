@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Application.Services;
 using WikiChatbotBackends.Infrastructure.Data;
@@ -24,7 +25,9 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IChatSessionRepository, ChatSessionRepository>();
         services.AddScoped<IChatHistoryRepository, ChatHistoryRepository>();
-
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IDetailRepository, DetailRepository>();
+        services.AddScoped<IDetailService, DetailService>(); // Auto DI with constructor
 
         // JWT Service
         var jwtSecret = configuration["Jwt:SecretKey"] ?? "YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!";
@@ -38,6 +41,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
         services.AddScoped<IAdminService, AdminService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IDetailService, DetailService>();
 
         // RAG Service with HttpClient
         services.AddHttpClient<IRagService, RagService>();

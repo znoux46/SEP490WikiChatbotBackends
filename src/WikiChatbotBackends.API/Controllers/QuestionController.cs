@@ -179,7 +179,7 @@ namespace WikiChatbotBackends.API.Controllers
         }
 
         /// <summary>
-        /// Delete a document from the RAG system
+        /// Delete a document from the RAG system   
         /// </summary>
         /// <param name="documentId">ID of the document to delete</param>
         /// <returns>Success status</returns>
