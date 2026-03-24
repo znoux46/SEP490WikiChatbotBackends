@@ -15,6 +15,38 @@ namespace WikiChatbotBackends.Infrastructure.Services
 {
     public class RagService : IRagService
     {
+        public async Task<JobStatusResponse> IngestNewAsync(GraphRagRequestDto request)
+        {
+            try
+            {
+                _logger.LogInformation("Ingest new to GraphRAG: {TargetPerson}", request.TargetPerson);
+                var response = await _httpClient.PostAsJsonAsync("/ingest_new", request);
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<JobStatusResponse>() ?? throw new Exception("Invalid response");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ingest new failed");
+                throw;
+            }
+        }
+
+        public async Task<JobStatusResponse> MigrateNewAsync(GraphRagMigrateDto request)
+        {
+            try
+            {
+                _logger.LogInformation("Migrate new to GraphRAG");
+                var response = await _httpClient.PostAsJsonAsync("/migrate_new", request);
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<JobStatusResponse>() ?? throw new Exception("Invalid response");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Migrate new failed");
+                throw;
+            }
+        }
+
         private readonly HttpClient _httpClient;
         private readonly ILogger<RagService> _logger;
         private readonly string _baseUrl;
