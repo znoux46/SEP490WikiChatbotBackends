@@ -5,8 +5,7 @@ namespace WikiChatbotBackends.Application.Interfaces;
 public interface IRagService
 {
     // Existing methods...
-    Task<JobStatusResponse> IngestNewAsync(GraphRagRequestDto request);
-    Task<JobStatusResponse> MigrateNewAsync(GraphRagMigrateDto request);
+    Task<JobStatusResponse> ChatGraphRagAsync(GraphRagRequestDto request);
     
     // Existing...
     Task<ChatResponse> ChatAsync(ChatRequest request);

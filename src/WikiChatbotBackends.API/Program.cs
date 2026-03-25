@@ -93,6 +93,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 
 // Infrastructure (Database, Repositories, Services)

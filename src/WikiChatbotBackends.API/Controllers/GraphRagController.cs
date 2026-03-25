@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using WikiChatbotBackends.Application.DTOs;
-using WikiChatbotBackends.Application.Interfaces;
+using Microsoft.Extensions.Logging;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace WikiChatbotBackends.API.Controllers;
 
@@ -8,80 +10,78 @@ namespace WikiChatbotBackends.API.Controllers;
 [Route("api/graphrag")]
 public class GraphRagController : ControllerBase
 {
-    private readonly IRagService _ragService;
-    private readonly IWikipediaService _wikiService;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<GraphRagController> _logger;
 
-    public GraphRagController(IRagService ragService, IWikipediaService wikiService, ILogger<GraphRagController> logger)
+private readonly IConfiguration _configuration;
+public GraphRagController(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<GraphRagController> logger)
     {
-        _ragService = ragService;
-        _wikiService = wikiService;
+        _httpClient = httpClientFactory.CreateClient();
+_httpClient.BaseAddress = new Uri(_configuration["RagService:BaseUrl"] ?? "http://localhost:8000");
         _logger = logger;
     }
 
     /// <summary>
-    /// Ingestion from Wikipedia name → GraphRAG /ingest_new (background)
+    /// 3. POST /chat - Graph RAG Query
     /// </summary>
-    [HttpPost("upload")]
-    public async Task<ActionResult<JobStatusResponse>> Upload([FromForm] string target_person, [FromQuery] string language = "vi")
+    [HttpPost("chat")]
+    public async Task<ActionResult> Chat([FromBody] object request)
     {
         try
         {
-            _logger.LogInformation("GraphRAG upload: {TargetPerson}", target_person);
-
-            var wiki = await _wikiService.GetArticleSummaryAsync(target_person, language);
-            if (wiki?.Extract == null)
-                return BadRequest(new { message = "Wikipedia article not found" });
-
-            var request = new GraphRagRequestDto 
-            { 
-                Text = wiki.Extract, 
-                TargetPerson = target_person, 
-                SourceType = "wiki"
-            };
-
-            var result = await _ragService.IngestNewAsync(request);
+            _logger.LogInformation("GraphRAG chat");
+            var response = await _httpClient.PostAsJsonAsync("/chat", request);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GraphRAG upload failed");
+            _logger.LogError(ex, "GraphRAG chat failed");
             return StatusCode(500, new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Migrate from Postgres → GraphRAG /migrate_new
+    /// 1. POST /ingest_new proxy
+    /// </summary>
+    [HttpPost("upload")]
+    public async Task<ActionResult> Upload([FromBody] object request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("/ingest_new", request);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// 2. POST /migrate_new proxy
     /// </summary>
     [HttpPost("migrate/persons")]
-    public async Task<ActionResult<JobStatusResponse>> Migrate([FromBody] GraphRagMigrateDto request)
+    public async Task<ActionResult> Migrate([FromBody] object request)
     {
-        try
-        {
-            _logger.LogInformation("GraphRAG migrate");
-            var result = await _ragService.MigrateNewAsync(request);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GraphRAG migrate failed");
-            return StatusCode(500, new { message = ex.Message });
-        }
+        var response = await _httpClient.PostAsJsonAsync("/migrate_new", request);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return Ok(result);
     }
-    
+
     [HttpGet("status/{jobId}")]
-    public async Task<ActionResult<JobStatusResponse>> Status(string jobId)
+    public async Task<ActionResult> Status(string jobId)
     {
-        var status = await _ragService.GetJobStatusAsync(jobId);
-        if (status.Status == "not_found") return NotFound();
-        return Ok(status);
+        var response = await _httpClient.GetAsync($"/status/{jobId}");
+        if (!response.IsSuccessStatusCode) return NotFound();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return Ok(result);
     }
 
     [HttpGet("health")]
     public async Task<ActionResult> Health()
     {
-        var healthy = await _ragService.HealthCheckAsync();
-        return healthy ? Ok(new { status = "healthy" }) : StatusCode(503);
+        var response = await _httpClient.GetAsync("/health");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return Ok(result);
     }
 }
 
