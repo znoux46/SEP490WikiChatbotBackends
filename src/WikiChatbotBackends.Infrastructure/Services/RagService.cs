@@ -15,6 +15,22 @@ namespace WikiChatbotBackends.Infrastructure.Services
 {
     public class RagService : IRagService
     {
+        public async Task<JobStatusResponse> ChatGraphRagAsync(GraphRagRequestDto request)
+        {
+            try
+            {
+                _logger.LogInformation("Chat GraphRAG: {Question}", request.Question);
+                var response = await _httpClient.PostAsJsonAsync("/chat", request);
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<JobStatusResponse>() ?? throw new Exception("Invalid response");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Chat GraphRAG failed");
+                throw;
+            }
+        }
+
         private readonly HttpClient _httpClient;
         private readonly ILogger<RagService> _logger;
         private readonly string _baseUrl;
