@@ -1,5 +1,7 @@
 
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
@@ -794,6 +796,94 @@ public class AdminService : IAdminService
         }
     }
 
+    public async Task<WikipediaGenerateNodeResponseDto> GenerateWikipediaNodeAsync(WikipediaGenerateNodeRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return new WikipediaGenerateNodeResponseDto
+            {
+                Success = false,
+                Message = "Name is required"
+            };
+        }
+
+        try
+        {
+            var language = string.IsNullOrWhiteSpace(request.Language) ? "en" : request.Language.ToLower();
+            if (language != "en" && language != "vi")
+            {
+                return new WikipediaGenerateNodeResponseDto
+                {
+                    Success = false,
+                    Message = "Unsupported language. Supported: en/vi"
+                };
+            }
+
+            // Step 1: Fetch Wikipedia content (same as AddDocument)
+            WikipediaSummaryResponse? wikiData = null;
+            if (request.Name.StartsWith("http") || request.Name.StartsWith("https"))
+            {
+                wikiData = await FetchWikipediaFromUrlAsync(request.Name, language);
+            }
+            else
+            {
+                wikiData = await _wikipediaService.GetArticleSummaryAsync(request.Name, language);
+                if (wikiData == null)
+                {
+                    var searchResults = await _wikipediaService.SearchAsync(request.Name, language, 1);
+                    if (searchResults != null && searchResults.Count > 0)
+                    {
+                        wikiData = await _wikipediaService.GetArticleSummaryAsync(searchResults[0].Title, language);
+                    }
+                }
+            }
+
+            if (wikiData == null)
+            {
+                return new WikipediaGenerateNodeResponseDto
+                {
+                    Success = false,
+                    Message = $"Wikipedia not found: {request.Name}"
+                };
+            }
+
+            // Build content for GraphRAG
+            var content = BuildWikipediaContent(wikiData);
+            var filename = $"{SanitizeFileName(request.CustomTitle ?? wikiData.Title)}.md";
+            var targetPerson = request.TargetPerson ?? Path.GetFileNameWithoutExtension(filename);
+
+            var ragServiceResponse = await _ragService.GenerateNodeAsync(targetPerson, filename, content);
+            
+            if (!ragServiceResponse.Success)
+            {
+                return new WikipediaGenerateNodeResponseDto
+                {
+                    Success = false,
+                    Message = ragServiceResponse.Message
+                };
+            }
+
+            return new WikipediaGenerateNodeResponseDto
+            {
+                Success = true,
+                Message = $"Wikipedia GraphRAG nodes queued (job: {ragServiceResponse.JobId})",
+                GraphRagJobId = ragServiceResponse.JobId,
+                Data = new { WikipediaTitle = wikiData.Title, WikipediaUrl = wikiData.ContentUrls?.Desktop?.Page }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new WikipediaGenerateNodeResponseDto
+            {
+                Success = false,
+                Message = ex.Message
+            };
+        }
+    }
+
     #endregion
 }
+
+
+
 

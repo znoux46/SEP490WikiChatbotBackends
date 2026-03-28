@@ -1,9 +1,10 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -18,11 +19,15 @@ namespace WikiChatbotBackends.Infrastructure.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<RagService> _logger;
         private readonly string _baseUrl;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
 
-        public RagService(HttpClient httpClient, IConfiguration configuration, ILogger<RagService> logger)
+        public RagService(HttpClient httpClient, IConfiguration configuration, ILogger<RagService> logger, IHttpClientFactory httpClientFactory)
         {
             _httpClient = httpClient;
             _logger = logger;
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
             _baseUrl = configuration["RagService:BaseUrl"] ?? "http://localhost:8000";
             
             // Configure HttpClient
@@ -292,5 +297,102 @@ namespace WikiChatbotBackends.Infrastructure.Services
                 return false;
             }
         }
+
+        public async Task<GenerateNodeResponseDto> GenerateNodeAsync(string targetPerson, string filename, string htmlContent)
+        {
+            try
+            {
+                // 1. LẤY ĐÚNG URL CỦA GRAPHRAG (LOCALHOST:8000)
+                var graphRagBaseUrl = _configuration["GraphRAGService:BaseUrl"]?.TrimEnd('/');
+                if (string.IsNullOrEmpty(graphRagBaseUrl)) graphRagBaseUrl = "http://localhost:8000";
+
+                // 2. TẠO CLIENT MỚI (KHÔNG DÙNG _httpClient CỦA CLASS)
+                // Việc này giúp tách biệt link Azure và link Localhost
+                using var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromMinutes(5); // Ingestion thường lâu nên cho timeout dài ra
+
+                using var content = new MultipartFormDataContent();
+
+                // File content
+                var fileBytes = Encoding.UTF8.GetBytes(htmlContent);
+                var fileContent = new ByteArrayContent(fileBytes);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/html");
+                content.Add(fileContent, "file", filename);
+
+                // Target person
+                content.Add(new StringContent(targetPerson), "target_person");
+
+                // 3. GỌI CHÍNH XÁC VÀO LOCALHOST
+                var finalUrl = $"{graphRagBaseUrl}/upload";
+                _logger.LogInformation(">>> ĐANG GỌI GRAPHRAG TẠI: {Url}", finalUrl);
+
+                var response = await client.PostAsync(finalUrl, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<GenerateNodeResponseDto>();
+                }
+
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                return new GenerateNodeResponseDto { Success = false, Message = $"GraphRAG error: {response.StatusCode} - {errorMsg}" };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối GraphRAG localhost");
+                return new GenerateNodeResponseDto { Success = false, Message = ex.Message };
+            }
+        }
+
+        private string SanitizeFileName(string name)
+        {
+            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+            return string.Join("_", name.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries)).Trim('_');
+        }
+
+        public async Task<GraphRagChatResponseDto> GraphRagChatAsync(GraphRagChatRequestDto request)
+        {
+            try
+            {
+                // 1. LẤY ĐÚNG URL LOCALHOST (Port 8000)
+                var graphRagUrl = _configuration["GraphRAGService:BaseUrl"]?.TrimEnd('/');
+                if (string.IsNullOrEmpty(graphRagUrl)) graphRagUrl = "http://localhost:8000";
+
+                // 2. DÙNG CLIENT SẠCH (KHÔNG DÙNG _httpClient CỦA CLASS)
+                using var client = _httpClientFactory.CreateClient();
+                
+                _logger.LogInformation("Proxying Chat to: {Url}", $"{graphRagUrl}/chat");
+
+                // 3. GỬI REQUEST
+                var response = await client.PostAsJsonAsync($"{graphRagUrl}/chat", new 
+                { 
+                    question = request.Question,
+                    // Đảm bảo key 'question' khớp với Pydantic QueryRequest bên Python
+                });
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    return new GraphRagChatResponseDto { Success = false, Error = $"FastAPI Error: {error}" };
+                }
+
+                // 4. DESERIALIZE ĐÚNG FORMAT
+                // Bên Python trả về QueryResponse(answer=...) nên ta cần lấy đúng field 'answer'
+                var result = await response.Content.ReadFromJsonAsync<GraphRagChatResponseDto>();
+                
+                if (result != null)
+                {
+                    result.Success = true;
+                    return result;
+                }
+
+                return new GraphRagChatResponseDto { Success = false, Error = "Empty response from GraphRAG" };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GraphRagChatAsync");
+                return new GraphRagChatResponseDto { Success = false, Error = ex.Message };
+            }
+        }
     }
 }
+

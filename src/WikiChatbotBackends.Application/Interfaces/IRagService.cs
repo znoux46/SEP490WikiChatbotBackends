@@ -73,5 +73,15 @@ namespace WikiChatbotBackends.Application.Interfaces
         /// </summary>
         /// <returns>True if service is healthy</returns>
         Task<bool> HealthCheckAsync();
+
+        /// <summary>
+        /// Generate node using document and target name - proxies to model /upload
+        /// </summary>
+        Task<GenerateNodeResponseDto> GenerateNodeAsync(string targetPerson, string filename, string htmlContent);
+
+        /// <summary>
+        /// GraphRAG chat - proxies to model /chat
+        /// </summary>
+        Task<GraphRagChatResponseDto> GraphRagChatAsync(GraphRagChatRequestDto request);
     }
 }
