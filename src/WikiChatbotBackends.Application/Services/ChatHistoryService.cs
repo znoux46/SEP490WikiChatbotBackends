@@ -31,9 +31,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = session.SessionId,
             SessionName = session.SessionName,
             CreatedAt = session.CreatedAt,
-            LastMessageAt = session.ChatHistories.Any() 
-                ? session.ChatHistories.Max(h => h.CreatedAt) 
-                : session.CreatedAt,
+            LastMessageAt = session.UpdatedAt,
             MessageCount = session.ChatHistories.Count
         }).OrderByDescending(s => s.LastMessageAt);
     }
