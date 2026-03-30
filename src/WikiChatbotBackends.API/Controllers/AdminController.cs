@@ -540,6 +540,8 @@ public class AdminController : ControllerBase
 
     #endregion
 
+
+
     /// <summary>
     /// Health check endpoint for admin panel
     /// </summary>
@@ -548,6 +550,30 @@ public class AdminController : ControllerBase
     public ActionResult Health()
     {
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
+    }
+
+    /// <summary>
+    /// Generate Neo4j nodes from Wikipedia article: fetch → RAG txt → GraphRAG /upload
+    /// Like /documents/wikipedia but + GraphRAG node generation
+    /// </summary>
+    [HttpPost("wikipedia/generate-node")]
+    public async Task<ActionResult<WikipediaGenerateNodeResponseDto>> GenerateWikipediaNode([FromBody] WikipediaGenerateNodeRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Wikipedia/generate-node: {Name} (lang: {Lang})", request.Name, request.Language);
+            var result = await _adminService.GenerateWikipediaNodeAsync(request);
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in wikipedia/generate-node");
+            return StatusCode(500, new WikipediaGenerateNodeResponseDto { Success = false, Message = ex.Message });
+        }
     }
 
     #region Document Management - Wikipedia Import

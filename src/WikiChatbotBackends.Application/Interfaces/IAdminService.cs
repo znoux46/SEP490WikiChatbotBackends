@@ -31,5 +31,7 @@ public interface IAdminService
     
     // Document Management - Wikipedia Edit
     Task<AddDocumentFromWikipediaResponseDto> EditDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
+
+    Task<WikipediaGenerateNodeResponseDto> GenerateWikipediaNodeAsync(WikipediaGenerateNodeRequestDto request);
 }
 

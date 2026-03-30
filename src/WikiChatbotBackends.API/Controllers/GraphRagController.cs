@@ -9,79 +9,40 @@ namespace WikiChatbotBackends.API.Controllers;
 public class GraphRagController : ControllerBase
 {
     private readonly IRagService _ragService;
-    private readonly IWikipediaService _wikiService;
     private readonly ILogger<GraphRagController> _logger;
 
-    public GraphRagController(IRagService ragService, IWikipediaService wikiService, ILogger<GraphRagController> logger)
+    public GraphRagController(IRagService ragService, ILogger<GraphRagController> logger)
     {
         _ragService = ragService;
-        _wikiService = wikiService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Ingestion from Wikipedia name → GraphRAG /ingest_new (background)
+    /// GraphRAG chat endpoint - proxies to model /chat, saves to chat history if SessionId provided
     /// </summary>
-    [HttpPost("upload")]
-    public async Task<ActionResult<JobStatusResponse>> Upload([FromForm] string target_person, [FromQuery] string language = "vi")
+    [HttpPost("chat")]
+    public async Task<ActionResult<GraphRagChatResponseDto>> Chat([FromBody] GraphRagChatRequestDto request)
     {
         try
         {
-            _logger.LogInformation("GraphRAG upload: {TargetPerson}", target_person);
+            _logger.LogInformation("GraphRAG chat request: {Question} (SessionId: {SessionId})", request.Question, request.SessionId);
 
-            var wiki = await _wikiService.GetArticleSummaryAsync(target_person, language);
-            if (wiki?.Extract == null)
-                return BadRequest(new { message = "Wikipedia article not found" });
+            var result = await _ragService.GraphRagChatAsync(request);
 
-            var request = new GraphRagRequestDto 
-            { 
-                Text = wiki.Extract, 
-                TargetPerson = target_person, 
-                SourceType = "wiki"
-            };
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
 
-            var result = await _ragService.IngestNewAsync(request);
+            // TODO: Optionally save to ChatHistory using IChatHistoryService (requires injection + session validation)
+            // Similar to QuestionController logic
+
             return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GraphRAG upload failed");
-            return StatusCode(500, new { message = ex.Message });
+            _logger.LogError(ex, "Error in GraphRAG chat");
+            return StatusCode(500, new GraphRagChatResponseDto { Success = false, Error = ex.Message });
         }
-    }
-
-    /// <summary>
-    /// Migrate from Postgres → GraphRAG /migrate_new
-    /// </summary>
-    [HttpPost("migrate/persons")]
-    public async Task<ActionResult<JobStatusResponse>> Migrate([FromBody] GraphRagMigrateDto request)
-    {
-        try
-        {
-            _logger.LogInformation("GraphRAG migrate");
-            var result = await _ragService.MigrateNewAsync(request);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GraphRAG migrate failed");
-            return StatusCode(500, new { message = ex.Message });
-        }
-    }
-    
-    [HttpGet("status/{jobId}")]
-    public async Task<ActionResult<JobStatusResponse>> Status(string jobId)
-    {
-        var status = await _ragService.GetJobStatusAsync(jobId);
-        if (status.Status == "not_found") return NotFound();
-        return Ok(status);
-    }
-
-    [HttpGet("health")]
-    public async Task<ActionResult> Health()
-    {
-        var healthy = await _ragService.HealthCheckAsync();
-        return healthy ? Ok(new { status = "healthy" }) : StatusCode(503);
     }
 }
-
