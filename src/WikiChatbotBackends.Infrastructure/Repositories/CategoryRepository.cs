@@ -28,7 +28,7 @@ public class CategoryRepository : Repository<Category>, ICategoryRepository
 
     public async Task<List<Category>> GetAllWithDetailsAsync()
     {
-        return await _dbSet.Include(c => c.Details).OrderByDescending(c => c.CreatedAt).ToListAsync();
+        return await _dbSet.OrderByDescending(c => c.CreatedAt).ToListAsync();
     }
 
     public async Task<List<Category>> GetForLandingAsync(int limit)

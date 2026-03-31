@@ -82,8 +82,8 @@ public class CategoryService : ICategoryService
             if (category == null)
                 throw new KeyNotFoundException($"Category {id} not found");
 
-            if (category.Details.Any())
-                throw new InvalidOperationException("Cannot delete category with details");
+            if (category.Documents.Any())
+                throw new InvalidOperationException("Cannot delete category with documents");
 
             await _categoryRepository.DeleteAsync(category);
         }
@@ -105,7 +105,7 @@ public class CategoryService : ICategoryService
                 Id = c.Id,
                 Name = c.Name,
                 Description = c.Description,
-                DetailCount = c.Details.Count,
+                DetailCount = c.Documents.Count(),
                 CreatedAt = c.CreatedAt
             }).ToList();
         }

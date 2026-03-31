@@ -6,7 +6,7 @@ public class DetailDto
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public string? WikipediaUrl { get; set; }
-    public Guid CategoryId { get; set; }
+    public Guid? CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }
