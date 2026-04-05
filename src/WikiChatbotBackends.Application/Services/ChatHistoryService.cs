@@ -141,6 +141,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = ch.SessionId,
             Question = ch.Question,
             Answer = ch.Answer,
+            AIModel = ch.AIModel,
             CreatedAt = ch.CreatedAt
         });
     }
@@ -158,6 +159,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = dto.SessionId,
             Question = dto.Question,
             Answer = dto.Answer,
+            AIModel = dto.AIModel,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -174,6 +176,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = created.SessionId,
             Question = created.Question,
             Answer = created.Answer,
+            AIModel = created.AIModel,
             CreatedAt = created.CreatedAt
         };
     }
@@ -192,6 +195,7 @@ public class ChatHistoryService : IChatHistoryService
 
         history.Question = dto.Question;
         history.Answer = dto.Answer;
+        history.AIModel = dto.AIModel;
         history.UpdatedAt = DateTime.UtcNow;
 
         await _chatHistoryRepository.UpdateAsync(history);
@@ -201,6 +205,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = history.SessionId,
             Question = history.Question,
             Answer = history.Answer,
+            AIModel = history.AIModel,
             CreatedAt = history.CreatedAt
         };
     }
@@ -223,7 +228,7 @@ public class ChatHistoryService : IChatHistoryService
     /// <summary>
     /// Tự động lấy thông tin từ HttpContext để lưu lịch sử Chat
     /// </summary>
-    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer, Guid sessionId)
+    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer,string AIModel, Guid sessionId)
     {
         var httpContext = _httpContextAccessor.HttpContext;
         if (httpContext == null) return string.Empty;
@@ -272,6 +277,7 @@ public class ChatHistoryService : IChatHistoryService
                 SessionId = sessionIdString,
                 Question = question,
                 Answer = answer,
+                AIModel = AIModel,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };

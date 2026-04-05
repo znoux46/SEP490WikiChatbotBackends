@@ -17,5 +17,5 @@ public interface IChatHistoryService
     Task<ChatHistoryDto> CreateChatHistoryAsync(int userId, CreateChatHistoryDto dto);
     Task<ChatHistoryDto> UpdateChatHistoryAsync(int userId, int historyId, UpdateChatHistoryDto dto);
     Task DeleteChatHistoryAsync(int userId, int historyId);
-    Task<string> SaveChatHistoryWithContextAsync(string question, string answer,Guid sessionId);
+    Task<string> SaveChatHistoryWithContextAsync(string question, string answer,string AIModel,Guid sessionId);
 }
