@@ -13,15 +13,18 @@ namespace WikiChatbotBackends.API.Controllers
     {
         private readonly IRagService _ragService;
         private readonly IChatHistoryService _chatHistoryService;
+        private readonly IQuestionRewriteService _questionRewriteService;
         private readonly ILogger<QuestionController> _logger;
 
         public QuestionController(
             IRagService ragService,
             IChatHistoryService chatHistoryService,
+            IQuestionRewriteService questionRewriteService,
             ILogger<QuestionController> logger)
         {
             _ragService = ragService;
             _chatHistoryService = chatHistoryService;
+            _questionRewriteService = questionRewriteService;
             _logger = logger;
         }
 
@@ -33,13 +36,13 @@ namespace WikiChatbotBackends.API.Controllers
             if (string.IsNullOrWhiteSpace(request.Question))
                 return BadRequest(new { message = "Question cannot be empty" });
 
+            // Rewrite question
+            request.Question = await _questionRewriteService.RewriteQuestion(request.Question,request.SessionId);
             // 2. Gọi RAG lấy câu trả lời
             var response = await _ragService.ChatAsync(request);
 
-            if (User.Identity?.IsAuthenticated == true) 
-            {
-                response.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer,"RAG", request.SessionId);
-            }
+           response.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer,"RAG", response.ActivePerson, request.SessionId);
+          
             response.AIModel = "RAG";
             return Ok(response);
         }

@@ -228,7 +228,7 @@ public class ChatHistoryService : IChatHistoryService
     /// <summary>
     /// Tự động lấy thông tin từ HttpContext để lưu lịch sử Chat
     /// </summary>
-    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer,string AIModel, Guid sessionId)
+    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer,string AIModel, string ActivePerson, Guid sessionId)
     {
         var httpContext = _httpContextAccessor.HttpContext;
         if (httpContext == null) return string.Empty;
@@ -258,6 +258,7 @@ public class ChatHistoryService : IChatHistoryService
                 {
                     UserId = userId,
                     SessionId = sessionIdString,
+                    ActivePerson = ActivePerson,
                     SessionName = question.Length > 30 ? question.Substring(0, 27) + "..." : question,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -268,6 +269,7 @@ public class ChatHistoryService : IChatHistoryService
             {
                 // Cập nhật thời gian cho Session
                 session.UpdatedAt = DateTime.UtcNow;
+                session.ActivePerson = ActivePerson; // Cập nhật ActivePerson nếu cần
                 await _sessionRepository.UpdateAsync(session);
             }
 
