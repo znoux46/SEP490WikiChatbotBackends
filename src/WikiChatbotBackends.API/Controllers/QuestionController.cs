@@ -38,9 +38,9 @@ namespace WikiChatbotBackends.API.Controllers
 
             if (User.Identity?.IsAuthenticated == true) 
             {
-                response.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer, request.SessionId);
+                response.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer,"RAG", request.SessionId);
             }
-            
+            response.AIModel = "RAG";
             return Ok(response);
         }
 

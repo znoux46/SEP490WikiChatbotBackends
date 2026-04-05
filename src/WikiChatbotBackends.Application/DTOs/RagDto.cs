@@ -23,6 +23,8 @@ namespace WikiChatbotBackends.Application.DTOs
         public string Question { get; set; } = string.Empty;
         public string SessionId { get; set; } = string.Empty;
         public string Answer { get; set; } = string.Empty;
+        public string AIModel { get; set; } = string.Empty;
+        public string ActivePerson { get; set; } = string.Empty;
         public Dictionary<string, object>? Metadata { get; set; }
     }
 

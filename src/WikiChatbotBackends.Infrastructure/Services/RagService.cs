@@ -1,4 +1,6 @@
-﻿﻿using System;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
@@ -7,10 +9,9 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace WikiChatbotBackends.Infrastructure.Services
 {
@@ -365,7 +366,7 @@ namespace WikiChatbotBackends.Infrastructure.Services
             return string.Join("_", name.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries)).Trim('_');
         }
 
-        public async Task<GraphRagChatResponseDto> GraphRagChatAsync(GraphRagChatRequestDto request)
+        public async Task<ChatResponse> GraphRagChatAsync(ChatRequest request)
         {
             try
             {
@@ -388,25 +389,24 @@ namespace WikiChatbotBackends.Infrastructure.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     var error = await response.Content.ReadAsStringAsync();
-                    return new GraphRagChatResponseDto { Success = false, Error = $"FastAPI Error: {error}" };
+                    throw new Exception($"FastAPI Error: {error}");
                 }
 
                 // 4. DESERIALIZE ĐÚNG FORMAT
                 // Bên Python trả về QueryResponse(answer=...) nên ta cần lấy đúng field 'answer'
-                var result = await response.Content.ReadFromJsonAsync<GraphRagChatResponseDto>();
+                var result = await response.Content.ReadFromJsonAsync<ChatResponse>();
                 
                 if (result != null)
                 {
-                    result.Success = true;
                     return result;
                 }
 
-                return new GraphRagChatResponseDto { Success = false, Error = "Empty response from GraphRAG" };
+                throw new Exception($"Empty response from GraphRAG");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in GraphRagChatAsync");
-                return new GraphRagChatResponseDto { Success = false, Error = ex.Message };
+                throw new Exception(ex.Message);
             }
         }
     }

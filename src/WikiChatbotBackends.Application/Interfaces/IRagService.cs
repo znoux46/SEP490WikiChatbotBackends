@@ -59,5 +59,5 @@ public interface IRagService
     /// <summary>
     /// GraphRAG chat - proxies to model /chat
     /// </summary>
-    Task<GraphRagChatResponseDto> GraphRagChatAsync(GraphRagChatRequestDto request);
+    Task<ChatResponse> GraphRagChatAsync(ChatRequest request);
 }

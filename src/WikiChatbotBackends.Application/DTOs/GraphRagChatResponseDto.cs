@@ -14,6 +14,8 @@ public class GraphRagChatResponseDto
     /// </summary>
     public string Answer { get; set; } = string.Empty;
 
+    public string ActivePerson { get; set; } = string.Empty;
+
     /// <summary>
     /// Raw response from model server
     /// </summary>

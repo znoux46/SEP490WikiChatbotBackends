@@ -38,6 +38,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.SessionId);
             entity.Property(e => e.SessionName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.ActivePerson).HasColumnType("text").HasMaxLength(200);
             entity.HasOne(e => e.User)
                 .WithMany(u => u.ChatSessions)
                 .HasForeignKey(e => e.UserId)
@@ -51,6 +52,7 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Question).IsRequired().HasColumnType("text");
             entity.Property(e => e.Answer).IsRequired().HasColumnType("text");
+            entity.Property(e => e.AIModel).HasColumnType("text").HasMaxLength(20);
             entity.HasOne(e => e.Session)
                 .WithMany(s => s.ChatHistories)
                 .HasForeignKey(e => e.SessionId)
