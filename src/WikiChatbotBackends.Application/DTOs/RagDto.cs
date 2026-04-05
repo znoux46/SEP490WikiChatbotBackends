@@ -25,6 +25,8 @@ namespace WikiChatbotBackends.Application.DTOs
         public string Answer { get; set; } = string.Empty;
         public string AIModel { get; set; } = string.Empty;
         public string ActivePerson { get; set; } = string.Empty;
+
+        [JsonIgnore]
         public Dictionary<string, object>? Metadata { get; set; }
     }
 
