@@ -4,6 +4,10 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Linq;
 
 namespace WikiChatbotBackends.Infrastructure.Services;
 
@@ -21,13 +25,45 @@ public class WikipediaService : IWikipediaService
 
     private HttpClient CreateHttpClient()
     {
-        var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromSeconds(30);
-        // Set User-Agent header as recommended by Wikipedia API
-        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("WikiChatbotBackends/1.0 (https://github.com; contact@example.com)");
+        var handler = new SocketsHttpHandler
+        {
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                // Tìm địa chỉ IP của Wikipedia
+                var entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, cancellationToken);
+                
+                // Ép chọn IPv4 (InterNetwork) để tránh Timeout IPv6 trên CachyOS
+                var address = entry.AddressList.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+                
+                if (address == null) throw new HttpRequestException("Không tìm thấy địa chỉ IPv4 cho Wikipedia");
+
+                var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                socket.NoDelay = true;
+
+                try
+                {
+                    await socket.ConnectAsync(new IPEndPoint(address, context.DnsEndPoint.Port), cancellationToken);
+                    // Trả về NetworkStream chuẩn (Sử dụng System.Net.Sockets)
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+            ConnectTimeout = TimeSpan.FromSeconds(20),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+        };
+
+        var httpClient = new HttpClient(handler);
+        httpClient.Timeout = TimeSpan.FromSeconds(60); 
+
+        httpClient.DefaultRequestHeaders.UserAgent.Clear();
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+
         return httpClient;
     }
-
     public async Task<WikipediaSummaryResponse?> GetArticleSummaryAsync(string title, string language = "en")
     {
         using var httpClient = CreateHttpClient();
@@ -65,8 +101,58 @@ public class WikipediaService : IWikipediaService
             throw;
         }
     }
+    
+    public async Task<WikipediaFullContentResponse?> GetArticleFullContentAsync(string title, string language = "vi")
+    {
+        using var httpClient = CreateHttpClient();
+        var encodedTitle = Uri.EscapeDataString(title.Replace(" ", "_"));
+        var url = $"https://{language}.wikipedia.org/api/rest_v1/page/mobile-html/{encodedTitle}";
 
-    public async Task<List<WikipediaSearchResult>> SearchAsync(string query, string language = "en", int limit = 10)
+        try 
+        {
+            _logger.LogInformation("Đang gửi request tải HTML: {Url}", url);
+            
+            // Sử dụng HttpCompletionOption.ResponseHeadersRead để tránh treo khi tải file nặng
+            using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            
+            // Kiểm tra mã trạng thái HTTP (404, 403, 500...)
+            if (!response.IsSuccessStatusCode) 
+            {
+                _logger.LogWarning("Wikipedia từ chối (Status: {Status}). Có thể bị chặn User-Agent.", response.StatusCode);
+                return null;
+            }
+
+            var htmlRaw = await response.Content.ReadAsStringAsync();
+
+            return new WikipediaFullContentResponse
+            {
+                Title = title,
+                Extract = "HTML Raw Content",
+                FullContent = htmlRaw,
+                Timestamp = DateTime.UtcNow.ToString("s")
+            };
+        }
+        // 1. Bắt lỗi Timeout cụ thể
+        catch (OperationCanceledException ex) when (!ex.CancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError("THẤT BẠI: Wikipedia không phản hồi sau {Timeout}s. (Có thể do IPv6 hoặc Firewall mạng nhà)", httpClient.Timeout.TotalSeconds);
+            return null;
+        }
+        // 2. Bắt lỗi kết nối (DNS, No Internet, SSL...)
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError("LỖI KẾT NỐI: Không thể chạm tới Server Wikipedia. Chi tiết: {Msg}", ex.Message);
+            return null;
+        }
+        // 3. Các lỗi không xác định khác
+        catch (Exception ex) 
+        {
+            _logger.LogError(ex, "LỖI HỆ THỐNG: Có sự cố khi xử lý bài {Title}", title);
+            return null;
+        }
+    }
+
+    public async Task<List<WikipediaSearchResult>> SearchAsync(string query, string language = "vi", int limit = 10)
     {
         using var httpClient = CreateHttpClient();
         try
@@ -159,6 +245,7 @@ public class WikipediaService : IWikipediaService
         }
     }
 }
+
 
 /// <summary>
 /// Wikipedia search API response

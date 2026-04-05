@@ -17,6 +17,7 @@ public class GenerateNodeResponseDto
     /// <summary>
     /// Job ID from model server if applicable
     /// </summary>
+    [JsonPropertyName("job_id")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? JobId { get; set; }
 
