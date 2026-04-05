@@ -10,13 +10,18 @@ public class GraphRagController : ControllerBase
 {
     private readonly IRagService _ragService;
     private readonly IChatHistoryService _chatHistoryService;
+    private readonly IQuestionRewriteService _questionRewriteService;
     private readonly ILogger<GraphRagController> _logger;
 
-    public GraphRagController(IRagService ragService, IChatHistoryService chatHistoryService, ILogger<GraphRagController> logger)
+    public GraphRagController(IRagService ragService,
+        IChatHistoryService chatHistoryService,
+        IQuestionRewriteService questionRewriteService,
+        ILogger<GraphRagController> logger)
     {
         _ragService = ragService;
         _logger = logger;
         _chatHistoryService = chatHistoryService;
+        _questionRewriteService = questionRewriteService;
     }
 
     /// <summary>
@@ -29,14 +34,15 @@ public class GraphRagController : ControllerBase
         {
             _logger.LogInformation("GraphRAG chat request: {Question} (SessionId: {SessionId})", request.Question, request.SessionId);
 
+            // Rewrite question
+            request.Question = await _questionRewriteService.RewriteQuestion(request.Question, request.SessionId);
+            // Call GraphRAG service
             var result = await _ragService.GraphRagChatAsync(request);
 
             result.AIModel = "GraphRAG"; // Indicate which model was used
 
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                result.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, result.Answer, "GraphRAG", request.SessionId);
-            }
+            // Save history
+            result.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, result.Answer, "GraphRAG",result.ActivePerson, request.SessionId);
 
             return Ok(result);
         }
