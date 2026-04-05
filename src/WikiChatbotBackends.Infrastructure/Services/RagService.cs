@@ -319,35 +319,43 @@ namespace WikiChatbotBackends.Infrastructure.Services
         {
             try
             {
-                // 1. LẤY ĐÚNG URL CỦA GRAPHRAG (LOCALHOST:8000)
+                // Log đường dẫn file để em dễ kiểm tra trong thư mục Debug/Root
+                var absolutePath = Path.GetFullPath(filename);
+                _logger.LogInformation(">>> ĐANG XỬ LÝ FILE TẠI: {Path}", absolutePath);
+
                 var graphRagBaseUrl = _configuration["GraphRAGService:BaseUrl"]?.TrimEnd('/');
                 if (string.IsNullOrEmpty(graphRagBaseUrl)) graphRagBaseUrl = "http://localhost:8000";
 
-                // 2. TẠO CLIENT MỚI (KHÔNG DÙNG _httpClient CỦA CLASS)
-                // Việc này giúp tách biệt link Azure và link Localhost
                 using var client = _httpClientFactory.CreateClient();
-                client.Timeout = TimeSpan.FromMinutes(5); // Ingestion thường lâu nên cho timeout dài ra
+                client.Timeout = TimeSpan.FromMinutes(5); 
 
                 using var content = new MultipartFormDataContent();
 
-                // File content
                 var fileBytes = Encoding.UTF8.GetBytes(htmlContent);
                 var fileContent = new ByteArrayContent(fileBytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/html");
                 content.Add(fileContent, "file", filename);
 
-                // Target person
                 content.Add(new StringContent(targetPerson), "target_person");
+                // Thêm các tham số mặc định để FastAPI không báo lỗi thiếu Form
+                content.Add(new StringContent("vietnam_history"), "preset");
+                content.Add(new StringContent("true"), "use_original_prompt");
 
-                // 3. GỌI CHÍNH XÁC VÀO LOCALHOST
                 var finalUrl = $"{graphRagBaseUrl}/upload";
-                _logger.LogInformation(">>> ĐANG GỌI GRAPHRAG TẠI: {Url}", finalUrl);
-
                 var response = await client.PostAsync(finalUrl, content);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    return await response.Content.ReadFromJsonAsync<GenerateNodeResponseDto>();
+                    // Đọc JSON trả về từ Python
+                    var result = await response.Content.ReadFromJsonAsync<GenerateNodeResponseDto>();
+                    
+                    if (result != null)
+                    {
+                        // Giữ nguyên logic cũ: Trả về object result đã có JobId (nếu DTO đã có JsonPropertyName)
+                        result.Success = true;
+                        _logger.LogInformation(">>> NHẬN JOB ID TỪ PYTHON: {JobId}", result.JobId);
+                        return result;
+                    }
                 }
 
                 var errorMsg = await response.Content.ReadAsStringAsync();

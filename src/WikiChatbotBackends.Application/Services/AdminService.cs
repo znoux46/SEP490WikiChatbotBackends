@@ -809,75 +809,107 @@ public class AdminService : IAdminService
 
         try
         {
-            var language = string.IsNullOrWhiteSpace(request.Language) ? "en" : request.Language.ToLower();
-            if (language != "en" && language != "vi")
-            {
-                return new WikipediaGenerateNodeResponseDto
-                {
-                    Success = false,
-                    Message = "Unsupported language. Supported: en/vi"
-                };
-            }
+            var language = string.IsNullOrWhiteSpace(request.Language) ? "vi" : request.Language.ToLower();
+        
+            // SỬ DỤNG CLASS MỚI TẠI ĐÂY
+            WikipediaFullContentResponse? wikiData = null;
 
-            // Step 1: Fetch Wikipedia content (same as AddDocument)
-            WikipediaSummaryResponse? wikiData = null;
-            if (request.Name.StartsWith("http") || request.Name.StartsWith("https"))
+            if (request.Name.StartsWith("http"))
             {
-                wikiData = await FetchWikipediaFromUrlAsync(request.Name, language);
+                // Nếu hàm này trả về SummaryResponse, em cần map nó sang FullContentResponse 
+                // hoặc tạo một hàm Fetch tương tự cho FullContent
+                wikiData = await FetchFullWikipediaFromUrlAsync(request.Name, language);
             }
             else
             {
-                wikiData = await _wikipediaService.GetArticleSummaryAsync(request.Name, language);
+                // Gọi Service mới lấy Full Content
+                wikiData = await _wikipediaService.GetArticleFullContentAsync(request.Name, language);
+                
                 if (wikiData == null)
                 {
                     var searchResults = await _wikipediaService.SearchAsync(request.Name, language, 1);
                     if (searchResults != null && searchResults.Count > 0)
                     {
-                        wikiData = await _wikipediaService.GetArticleSummaryAsync(searchResults[0].Title, language);
+                        wikiData = await _wikipediaService.GetArticleFullContentAsync(searchResults[0].Title, language);
                     }
                 }
             }
 
-            if (wikiData == null)
-            {
-                return new WikipediaGenerateNodeResponseDto
-                {
-                    Success = false,
-                    Message = $"Wikipedia not found: {request.Name}"
-                };
-            }
+            if (wikiData == null) return new WikipediaGenerateNodeResponseDto { Success = false, Message = "Not found" };
 
-            // Build content for GraphRAG
-            var content = BuildWikipediaContent(wikiData);
-            var filename = $"{SanitizeFileName(request.CustomTitle ?? wikiData.Title)}.md";
-            var targetPerson = request.TargetPerson ?? Path.GetFileNameWithoutExtension(filename);
-
-            var ragServiceResponse = await _ragService.GenerateNodeAsync(targetPerson, filename, content);
+            // Dùng hàm Build mới dành riêng cho FullContentResponse
+            var content = BuildFullWikipediaContent(wikiData);
             
-            if (!ragServiceResponse.Success)
-            {
-                return new WikipediaGenerateNodeResponseDto
-                {
-                    Success = false,
-                    Message = ragServiceResponse.Message
-                };
-            }
+            // Logic ghi file debug và gọi RAG Service giữ nguyên...
+            var filename = $"{SanitizeFileName(request.CustomTitle ?? wikiData.Title)}.md";
+            var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filename);
+            await File.WriteAllTextAsync(debugPath, content);
 
-            return new WikipediaGenerateNodeResponseDto
-            {
+            var ragServiceResponse = await _ragService.GenerateNodeAsync(request.TargetPerson ?? wikiData.Title, filename, content);
+            
+            return new WikipediaGenerateNodeResponseDto {
                 Success = true,
-                Message = $"Wikipedia GraphRAG nodes queued (job: {ragServiceResponse.JobId})",
+                Message = $"Queued job: {ragServiceResponse.JobId}",
                 GraphRagJobId = ragServiceResponse.JobId,
-                Data = new { WikipediaTitle = wikiData.Title, WikipediaUrl = wikiData.ContentUrls?.Desktop?.Page }
+                Data = new { WikipediaTitle = wikiData.Title }
             };
+        }
+        catch (Exception ex) { return new WikipediaGenerateNodeResponseDto { Success = false, Message = ex.Message }; }
+    }
+
+    private string BuildFullWikipediaContent(WikipediaFullContentResponse wikiData)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# {wikiData.Title}");
+        if (!string.IsNullOrWhiteSpace(wikiData.Description)) sb.AppendLine($"> {wikiData.Description}\n");
+
+        // Ưu tiên FullContent vì đây là dữ liệu chính cho GraphRAG
+        if (!string.IsNullOrWhiteSpace(wikiData.FullContent))
+        {
+            sb.AppendLine(wikiData.FullContent);
+        }
+        else
+        {
+            sb.AppendLine("## Summary");
+            sb.AppendLine(wikiData.Extract);
+        }
+
+        sb.AppendLine("\n---");
+        sb.AppendLine("## Metadata");
+        sb.AppendLine($"- Source: Wikipedia ({wikiData.ContentUrls?.Desktop?.Page})");
+        return sb.ToString();
+    }
+
+    private async Task<WikipediaFullContentResponse?> FetchFullWikipediaFromUrlAsync(string url, string language)
+    {
+        try
+        {
+            // 1. Phân tích URL để lấy Title
+            // Ví dụ: https://vi.wikipedia.org/wiki/Nguyễn_Trãi
+            var uri = new Uri(url);
+            var path = uri.AbsolutePath;
+            
+            if (path.StartsWith("/wiki/"))
+            {
+                // Cắt bỏ phần "/wiki/" (6 ký tự)
+                var title = path.Substring(6); 
+                
+                // Unescape để chuyển từ "Nguy%E1%BB%85n_Tr%C3%A3i" thành "Nguyễn Trãi"
+                title = Uri.UnescapeDataString(title.Replace("_", " "));
+                
+                _logger.LogInformation("Extracted title for Full Content from URL: {Title}", title);
+
+                // 2. Gọi Service lấy Full Content thay vì Summary
+                return await _wikipediaService.GetArticleFullContentAsync(title, language);
+            }
+            
+            _logger.LogWarning("URL format not supported for Wikipedia extraction: {Url}", url);
+            return null;
         }
         catch (Exception ex)
         {
-            return new WikipediaGenerateNodeResponseDto
-            {
-                Success = false,
-                Message = ex.Message
-            };
+            _logger.LogError(ex, "Error extracting full content title from URL: {Url}", url);
+            return null;
         }
     }
 
