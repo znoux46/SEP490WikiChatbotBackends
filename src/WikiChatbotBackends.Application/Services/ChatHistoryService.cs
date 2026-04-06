@@ -242,10 +242,12 @@ public class ChatHistoryService : IChatHistoryService
             userId = 0;
         }
 
+        var sessionIdString = (sessionId != Guid.Empty) ? sessionId : Guid.NewGuid();
+
         try
         {
             // 2. Lấy SessionId (GUID string) từ Header hoặc tạo mới
-            var sessionIdString = sessionId!=Guid.Empty ? sessionId: Guid.NewGuid();
+            // var sessionIdString = sessionId!=Guid.Empty ? sessionId: Guid.NewGuid();
 
             // 3. Tìm hoặc tạo Session dựa trên SessionId (string) và UserId
             var sessions = await _sessionRepository.FindAsync(s => s.UserId == userId && s.SessionId == sessionIdString);
@@ -292,7 +294,15 @@ public class ChatHistoryService : IChatHistoryService
         {
             // Log lỗi nhưng không làm gián đoạn luồng trả lời của AI
             // _logger.LogError(ex, "Failed to save history in service");
-            return string.Empty;
+            // return string.Empty;
+
+            // Bước 2: Log lỗi để em biết DB đang bị gì (Double Insert, Connection...)
+            // _logger.LogError(ex, "Lưu lịch sử thất bại cho User {UserId}, Session {SessionId}", userId, sessionIdString);
+
+            // Bước 3: QUAN TRỌNG NHẤT
+            // Dù lưu DB thất bại, ta vẫn trả về sessionIdString mà ta đã tạo ở trên.
+            // Frontend sẽ nhận được ID này, coi như "phiên chat tạm" và không báo lỗi UI.
+            return sessionIdString.ToString();
         }
     }
 }
