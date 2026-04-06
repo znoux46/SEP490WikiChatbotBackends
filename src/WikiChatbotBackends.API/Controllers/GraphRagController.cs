@@ -52,4 +52,18 @@ public class GraphRagController : ControllerBase
             return StatusCode(500, new GraphRagChatResponseDto { Success = false, Error = ex.Message });
         }
     }
+
+    [HttpGet("node-status/{jobId}")]
+    public async Task<IActionResult> GetNodeStatus(string jobId)
+    {
+        var status = await _ragService.GetNodeStatusAsync(jobId);
+        
+        if (status == null)
+        {
+            return NotFound(new { message = $"Không tìm thấy Job ID: {jobId}" });
+        }
+
+        // Trả về nguyên văn object DTO khớp hoàn toàn với response từ Python
+        return Ok(status);
+    }
 }

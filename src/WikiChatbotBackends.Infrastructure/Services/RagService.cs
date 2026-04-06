@@ -417,6 +417,35 @@ namespace WikiChatbotBackends.Infrastructure.Services
                 throw new Exception(ex.Message);
             }
         }
+
+        public async Task<GraphRagJobStatusResponseDTO?> GetNodeStatusAsync(string jobId)
+        {
+            try
+            {
+                var graphRagBaseUrl = _configuration["GraphRAGService:BaseUrl"]?.TrimEnd('/');
+                if (string.IsNullOrEmpty(graphRagBaseUrl)) 
+                    graphRagBaseUrl = "https://sep490wikichatbotgraphragmodel-bcf9hvcecfc9edc8.japaneast-01.azurewebsites.net";
+
+                using var client = _httpClientFactory.CreateClient();
+                var url = $"{graphRagBaseUrl}/status/{jobId}";
+
+                _logger.LogInformation(">>> ĐANG KIỂM TRA TRẠNG THÁI JOB: {Url}", url);
+
+                var response = await client.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<GraphRagJobStatusResponseDTO>();
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy status từ GraphRAG cho JobId: {JobId}", jobId);
+                return null;
+            }
+        }
     }
 }
 
