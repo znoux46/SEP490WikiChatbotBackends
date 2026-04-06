@@ -60,4 +60,6 @@ public interface IRagService
     /// GraphRAG chat - proxies to model /chat
     /// </summary>
     Task<ChatResponse> GraphRagChatAsync(ChatRequest request);
+
+    Task<GraphRagJobStatusResponseDTO?> GetNodeStatusAsync(string jobId);
 }
