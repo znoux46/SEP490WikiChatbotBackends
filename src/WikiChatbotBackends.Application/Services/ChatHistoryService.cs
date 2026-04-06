@@ -237,7 +237,7 @@ public class ChatHistoryService : IChatHistoryService
         if (httpContext == null) return sessionIdString.ToString();
 
 
-        int? userId = null;
+        int userId = 0;
         // 1. Lấy UserId từ Claims (nếu không có thì mặc định là 0 hoặc xử lý tùy ý)
         var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdClaim, out int parsedId))
@@ -320,7 +320,9 @@ public class ChatHistoryService : IChatHistoryService
             // Bước 3: QUAN TRỌNG NHẤT
             // Dù lưu DB thất bại, ta vẫn trả về sessionIdString mà ta đã tạo ở trên.
             // Frontend sẽ nhận được ID này, coi như "phiên chat tạm" và không báo lỗi UI.
-            return sessionIdString.ToString();
         }
+
+        return sessionIdString.ToString();
+
     }
 }
