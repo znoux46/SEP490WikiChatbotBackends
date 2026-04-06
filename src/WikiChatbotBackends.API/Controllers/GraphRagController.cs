@@ -32,10 +32,14 @@ public class GraphRagController : ControllerBase
     {
         try
         {
+            string displayQuestion = request.Question;
+            
             _logger.LogInformation("GraphRAG chat request: {Question} (SessionId: {SessionId})", request.Question, request.SessionId);
 
             // Rewrite question
-            request.Question = await _questionRewriteService.RewriteQuestion(request.Question, request.SessionId);
+            var rewrittenQuestion = await _questionRewriteService.RewriteQuestion(displayQuestion, request.SessionId);
+            request.Question = rewrittenQuestion;            
+            
             // Call GraphRAG service
             var result = await _ragService.GraphRagChatAsync(request);
 
