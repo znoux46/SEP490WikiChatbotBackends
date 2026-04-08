@@ -2,9 +2,11 @@
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
+using HtmlAgilityPack;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
+using System.Linq;
 
 namespace WikiChatbotBackends.Application.Services;
 
@@ -460,6 +462,180 @@ public class AdminService : IAdminService
         await _chatSessionRepository.DeleteAllUserChatSessionsAsync(userId);
         return true;
     }
+
+    #endregion
+
+    #region Person Summary
+
+    /// <summary>
+    /// Get person summary from Wikipedia: extract → LLM summarize → return formatted response
+    /// </summary>
+    public async Task<PersonSummaryResponseDto> GetPersonSummaryAsync(PersonSummaryRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.EntityName))
+        {
+            return new PersonSummaryResponseDto
+            {
+                Status = "error",
+                Message = "EntityName is required"
+            };
+        }
+
+        try
+        {
+            var language = string.IsNullOrWhiteSpace(request.Language) ? "vi" : request.Language.ToLower();
+            _logger.LogInformation("Fetching person summary for {EntityName} (lang: {Language})", request.EntityName, language);
+
+            // Step 1: Fetch Wikipedia extract (plaintext)
+            var wikiData = await _wikipediaService.GetArticleFullContentAsync(request.EntityName, language);
+            if (wikiData == null)
+            {
+                // Try search if exact match fails
+                var searchResults = await _wikipediaService.SearchAsync(request.EntityName, language, 5);
+                if (searchResults?.Count > 0)
+                {
+                    wikiData = await _wikipediaService.GetArticleFullContentAsync(searchResults[0].Title, language);
+                }
+            }
+
+            if (wikiData == null)
+            {
+                return new PersonSummaryResponseDto
+                {
+                    Status = "error",
+                    Message = $"Wikipedia article not found for '{request.EntityName}'. Try disambiguation search."
+                };
+            }
+
+            var html = wikiData?.FullContent ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return new PersonSummaryResponseDto
+                {
+                    Status = "error",
+                    Message = "No content found in Wikipedia article."
+                };
+            }
+
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+
+            // Flexible content extraction for desktop/mobile Wikipedia - using //*[@class='mw-parser-output']
+            HtmlNode? contentDiv = doc.GetElementbyId("mw-content-text") 
+                                ?? doc.GetElementbyId("content")
+                                ?? doc.DocumentNode.SelectSingleNode("//div[@class='mw-parser-output']")
+                                ?? doc.DocumentNode.SelectSingleNode("//section[@class='mw-parser-output']")
+                                ?? doc.DocumentNode.SelectSingleNode("//div[@id='bodyContent']")
+                                ?? doc.DocumentNode.SelectSingleNode("//main[@id='bodyContent']")
+                                ?? doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'mw-body-content')]");
+
+            string usedSelector = contentDiv?.Id ?? contentDiv?.GetAttributeValue("class", "unknown");
+            _logger.LogInformation("Found content div using selector: {Selector} (Title: {DocTitle})", usedSelector, doc.DocumentNode.SelectSingleNode("//title")?.InnerText);
+
+            if (contentDiv == null)
+            {
+                return new PersonSummaryResponseDto
+                {
+                    Status = "error",
+                    Message = "No content div found in Wikipedia HTML. Tried: mw-content-text, content, .mw-parser-output, .mw-body-content, #bodyContent."
+                };
+            }
+            
+            var paragraphs = contentDiv.SelectNodes("//p");
+            if (paragraphs == null || paragraphs.Count == 0)
+            {
+                return new PersonSummaryResponseDto
+                {
+                    Status = "error",
+                    Message = "No paragraphs found in content div."
+                };
+            }
+            
+            _logger.LogInformation("Extracted {ParaCount} paragraphs from Wikipedia content", paragraphs.Count);
+            
+            var sb = new StringBuilder();
+            int paraCount = 0;
+            foreach (var p in paragraphs.Take(10)) // Take more paras for better summary
+            {
+                var text = p.InnerText?.Trim();
+                if (!string.IsNullOrWhiteSpace(text) && text.Length > 20) // Skip very short paras
+                {
+                    sb.AppendLine(text);
+                    paraCount++;
+                    if (sb.Length > 5000) break; // Limit total length
+                }
+            }
+            
+            _logger.LogInformation("Built summary from {ParaCount} paragraphs ({Length} chars)", paraCount, sb.Length);
+
+            var rawSummary = sb.ToString();
+            if (string.IsNullOrWhiteSpace(rawSummary))
+            {
+                return new PersonSummaryResponseDto
+                {
+                    Status = "error",
+                    Message = "No content after parsing."
+                };
+            }
+
+            // Chain all cleaning on rawSummary from HtmlAgilityPack (first 3 paragraphs)
+            var summary = rawSummary;
+
+            // Task-specific cleaning: remove citations, normalize
+            summary = System.Text.RegularExpressions.Regex.Replace(summary, @"\[\d+\]|\[cần dẫn nguồn\]|\[citation needed\]", string.Empty, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+            summary = System.Text.RegularExpressions.Regex.Replace(summary, @"\s{2,}", " ");
+            summary = System.Text.RegularExpressions.Regex.Replace(summary, @"\s*-\s*", "-"); // Normalize dates like ( 1906 - 03 - 01 )
+            summary = System.Text.RegularExpressions.Regex.Replace(summary, @"[ \t\n\r\f\v]+\.{3}", "."); // Replace excessive ... with .
+
+            // Remove duplicate title at start e.g. "Phạm Văn Đồng Phạm Văn Đồng" -> "Phạm Văn Đồng ..."
+            var words = summary.Split(new char[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length >= 4 && string.Equals(words[0], words[2], StringComparison.OrdinalIgnoreCase) && string.Equals(words[1], words[3], StringComparison.OrdinalIgnoreCase))
+            {
+                summary = string.Join(" ", words.Skip(2));
+            }
+            
+            
+            // No length limit - return full cleaned content
+
+            if (string.IsNullOrWhiteSpace(summary))
+            {
+                return new PersonSummaryResponseDto
+                {
+                    Status = "error",
+                    Message = "No content found in Wikipedia article."
+                };
+            }
+
+            // Step 4: Build response
+            var sourceUrl = $"https://{language}.wikipedia.org/wiki/{Uri.EscapeDataString(request.EntityName.Replace(" ", "_"))}";
+            var data = new PersonSummaryDataDto
+            {
+                Name = wikiData.Title ?? request.EntityName,
+                Summary = summary, // Full clean text (no HTML, no limit)
+                SourceUrl = sourceUrl,
+                ExtractedDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            };
+
+            return new PersonSummaryResponseDto
+            {
+                Status = "success",
+                Data = data
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating person summary for {EntityName}", request.EntityName);
+            return new PersonSummaryResponseDto
+            {
+                Status = "error",
+                Message = ex.Message
+            };
+        }
+    }
+
+    #endregion
+
+    #region Document Management - Wikipedia Import
 
     #endregion
 
