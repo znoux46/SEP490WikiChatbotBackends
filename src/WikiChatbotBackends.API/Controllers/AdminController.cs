@@ -538,9 +538,30 @@ public class AdminController : ControllerBase
         }
     }
 
-    #endregion
+#endregion
 
-
+    /// <summary>
+    /// Generate person summary from Wikipedia for admin use
+    /// </summary>
+    [HttpPost("wikipedia/person-summary")]
+    public async Task<ActionResult<PersonSummaryResponseDto>> PersonSummary([FromBody] PersonSummaryRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Admin requested person summary for {EntityName}", request.EntityName);
+            var result = await _adminService.GetPersonSummaryAsync(request);
+            if (result.Status == "success")
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in wikipedia/person-summary");
+            return StatusCode(500, new PersonSummaryResponseDto { Status = "error", Message = ex.Message });
+        }
+    }
 
     /// <summary>
     /// Health check endpoint for admin panel

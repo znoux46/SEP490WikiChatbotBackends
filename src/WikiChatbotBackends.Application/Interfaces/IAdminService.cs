@@ -33,5 +33,8 @@ public interface IAdminService
     Task<AddDocumentFromWikipediaResponseDto> EditDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
 
     Task<WikipediaGenerateNodeResponseDto> GenerateWikipediaNodeAsync(WikipediaGenerateNodeRequestDto request);
+
+    // Person Summary from Wikipedia
+    Task<PersonSummaryResponseDto> GetPersonSummaryAsync(PersonSummaryRequestDto request);
 }
 
