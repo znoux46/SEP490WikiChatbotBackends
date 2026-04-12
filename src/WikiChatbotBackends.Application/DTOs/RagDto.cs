@@ -155,7 +155,7 @@ namespace WikiChatbotBackends.Application.DTOs
         public string? FileName { get; set; }
 
         [JsonPropertyName("progress")]
-        public int Progress { get; set; }
+        public object? Progress { get; set; }
 
         [JsonPropertyName("message")]
         public string? Message { get; set; }

@@ -885,7 +885,7 @@ public class AdminService : IAdminService
                 status = status.Status?.ToLower() ?? "unknown",
                 document_id = status.DocumentId,
                 file_name = status.FileName ?? "wikipedia_doc.txt",
-                progress = status.Progress != 0 ? status.Progress : (status.Status?.ToLower() == "completed" ? 100 : 0),
+                progress = TryParseProgress(status.Progress, status.Status),
                 message = status.Message ?? "Processing...",
                 error = status.Error,
                 timing = new {
@@ -923,6 +923,30 @@ public class AdminService : IAdminService
     }
 
     #endregion
+
+    private int TryParseProgress(object? progressObj, string? status)
+    {
+        int progressValue = 0;
+
+        // 1. Kiểm tra nếu nó là kiểu số (int, long, double...)
+        if (progressObj is int i) progressValue = i;
+        else if (progressObj is long l) progressValue = (int)l;
+        else if (progressObj is double d) progressValue = (int)d;
+        else if (progressObj is System.Text.Json.JsonElement element)
+        {
+            // Nếu là JsonElement (do dùng object trong DTO), ta trích xuất giá trị số
+            if (element.ValueKind == System.Text.Json.JsonValueKind.Number)
+                element.TryGetInt32(out progressValue);
+        }
+
+        // 2. Fallback dựa trên Status nếu progress vẫn bằng 0
+        if (progressValue == 0 && status?.ToLower() == "completed")
+        {
+            return 100;
+        }
+
+        return progressValue;
+    }
 }
 
 
