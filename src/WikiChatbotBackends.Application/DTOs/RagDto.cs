@@ -77,13 +77,13 @@ namespace WikiChatbotBackends.Application.DTOs
 
     public class FileUploadResult
     {
-        [JsonPropertyName("filename")]
-        public string Filename { get; set; } = string.Empty;
+        [JsonPropertyName("file_name")] // Đổi từ "filename" thành "file_name" cho khớp với Python logic của bạn
+        public string FileName { get; set; } = string.Empty;
 
         [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
 
-        [JsonPropertyName("job_id")] // Phải map từ snake_case
+        [JsonPropertyName("job_id")]
         public string? JobId { get; set; }
 
         [JsonPropertyName("document_id")]
@@ -95,11 +95,14 @@ namespace WikiChatbotBackends.Application.DTOs
 
     public class DocumentUploadResponse
     {
-        [JsonPropertyName("total_files")] // Map từ total_files trong MultiFileUploadResponse
-        public int TotalFiles { get; set; }
+        [JsonPropertyName("batch_id")]
+        public string BatchId { get; set; } = string.Empty;
 
-        [JsonPropertyName("results")]
-        public List<FileUploadResult> Results { get; set; } = new();
+        [JsonPropertyName("jobs")]
+        public List<FileUploadResult> Jobs { get; set; } = new();
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
     }
 
     // ============================================================================
@@ -139,10 +142,31 @@ namespace WikiChatbotBackends.Application.DTOs
     
     public class JobStatusResponse
     {
+        [JsonPropertyName("job_id")]
         public string JobId { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty; // pending, processing, completed, failed
-        public string? Message { get; set; }
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("document_id")]
         public string? DocumentId { get; set; }
-        public Dictionary<string, object>? Progress { get; set; }
+
+        [JsonPropertyName("file_name")]
+        public string? FileName { get; set; }
+
+        [JsonPropertyName("progress")]
+        public int Progress { get; set; }
+
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+
+        [JsonPropertyName("start_time")]
+        public DateTime? StartTime { get; set; }
+
+        [JsonPropertyName("end_time")]
+        public DateTime? EndTime { get; set; }
     }
 }

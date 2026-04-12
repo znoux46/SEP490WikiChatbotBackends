@@ -139,37 +139,43 @@ namespace WikiChatbotBackends.Infrastructure.Services
         {
             try
             {
-                _logger.LogInformation("Uploading document to RAG service: {FileName}", fileName);
-
                 using var content = new MultipartFormDataContent();
+
+                // Đảm bảo Stream ở vị trí 0 - Đây là điều kiện tiên quyết để gửi dữ liệu
+                if (fileStream.CanSeek) fileStream.Position = 0;
                 
                 var streamContent = new StreamContent(fileStream);
-                streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                content.Add(streamContent, "files", fileName);
-                content.Add(new StringContent(chunkSize.ToString()), "chunk_size");
-                content.Add(new StringContent(chunkOverlap.ToString()), "chunk_overlap");
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
 
-                var response = await _httpClient.PostAsync("/api/v1/process", content);
-                response.EnsureSuccessStatusCode();
+                // Gửi file với key là "files" (không thêm ngoặc kép thủ công)
+                // Python mong đợi files: List[UploadFile]
+                content.Add(streamContent, "files", fileName); 
 
-                var result = await response.Content.ReadFromJsonAsync<DocumentUploadResponse>();
+                // Gửi source_type vì Python có tham số này trong upload_files
+                content.Add(new StringContent("wikipedia"), "source_type");
+
+                // LƯU Ý: Không gửi chunk_size/chunk_overlap ở đây nếu Python 
+                // chỉ nhận files và source_type trong tham số hàm upload_files.
+                // Gửi dư field có thể khiến FastAPI báo lỗi 422 hoặc parse sai.
+
+                var response = await _httpClient.PostAsync("api/v1/upload", content);
                 
-                if (result == null)
+                var rawJson = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("RAW RESPONSE FROM RAG: {Raw}", rawJson);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    throw new Exception("Failed to deserialize upload response");
+                    var errorDetail = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("RAG Service trả về lỗi: {Detail}", errorDetail);
+                    response.EnsureSuccessStatusCode();
                 }
 
-                _logger.LogInformation("Document uploaded successfully: {FileName}", fileName);
-                return result;
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, "HTTP error while uploading document");
-                throw new Exception($"Failed to upload document to RAG service: {ex.Message}", ex);
+                var result = await response.Content.ReadFromJsonAsync<DocumentUploadResponse>();
+                return result ?? throw new Exception("Response rỗng");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in UploadDocumentAsync");
+                _logger.LogError(ex, "Lỗi kết nối RAG Service khi upload {File}", fileName);
                 throw;
             }
         }
@@ -266,7 +272,7 @@ namespace WikiChatbotBackends.Infrastructure.Services
             {
                 _logger.LogInformation("Fetching job status {JobId} from RAG service", jobId);
 
-                var response = await _httpClient.GetAsync($"/api/v1/status/{jobId}");
+                var response = await _httpClient.GetAsync($"/api/v1/jobs/{jobId}");
                 response.EnsureSuccessStatusCode();
 
                 var result = await response.Content.ReadFromJsonAsync<JobStatusResponse>();

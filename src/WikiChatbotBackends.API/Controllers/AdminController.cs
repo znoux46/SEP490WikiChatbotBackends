@@ -538,7 +538,7 @@ public class AdminController : ControllerBase
         }
     }
 
-#endregion
+    #endregion
 
     /// <summary>
     /// Generate person summary from Wikipedia for admin use
@@ -560,6 +560,58 @@ public class AdminController : ControllerBase
         {
             _logger.LogError(ex, "Error in wikipedia/person-summary");
             return StatusCode(500, new PersonSummaryResponseDto { Status = "error", Message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/admin/wikipedia/chunking - Start Wikipedia content chunking job
+    /// </summary>
+    [HttpPost("wikipedia/chunking")]
+    public async Task<ActionResult<WikipediaChunkingResponseDto>> StartWikipediaChunking([FromBody] WikipediaChunkingRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Admin started Wikipedia chunking for {Name}", request.Name);
+            var result = await _adminService.StartWikipediaChunkingAsync(request);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid request for Wikipedia chunking");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Wikipedia article not found");
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in wikipedia/chunking");
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// GET /api/admin/wikipedia/chunk-status/{jobId} - Check job status
+    /// </summary>
+    [HttpGet("wikipedia/chunk-status/{jobId}")]
+    public async Task<ActionResult<WikipediaJobStatusResponseDto>> GetWikipediaChunkStatus(string jobId)
+    {
+        try
+        {
+            _logger.LogInformation("Checking Wikipedia chunk status for job {JobId}", jobId);
+            var status = await _adminService.GetWikipediaJobStatusAsync(jobId);
+            if (status == null)
+            {
+                return NotFound(new { message = $"Job {jobId} not found" });
+            }
+            return Ok(status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting chunk status {JobId}", jobId);
+            return StatusCode(500, new { message = ex.Message });
         }
     }
 
@@ -596,77 +648,5 @@ public class AdminController : ControllerBase
             return StatusCode(500, new WikipediaGenerateNodeResponseDto { Success = false, Message = ex.Message });
         }
     }
-
-    #region Document Management - Wikipedia Import
-
-    /// <summary>
-    /// Add a document from Wikipedia by specifying a historical figure's name
-    /// </summary>
-    /// <param name="request">Request containing the name of the historical figure</param>
-    /// <returns>Information about the imported document</returns>
-    [HttpPost("documents/wikipedia")]
-    public async Task<ActionResult<AddDocumentFromWikipediaResponseDto>> AddDocumentFromWikipedia(
-        [FromBody] AddDocumentFromWikipediaRequestDto request)
-    {
-        try
-        {
-            _logger.LogInformation("Adding document from Wikipedia: {Name}", request.Name);
-
-            var result = await _adminService.AddDocumentFromWikipediaAsync(request);
-
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
-
-            _logger.LogInformation("Successfully added document from Wikipedia: {Title}", result.WikipediaTitle);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error adding document from Wikipedia: {Name}", request.Name);
-            return BadRequest(new AddDocumentFromWikipediaResponseDto
-            {
-                Success = false,
-                Message = $"Error importing document: {ex.Message}"
-            });
-        }
-    }
-
-    /// <summary>
-    /// Edit a document from Wikipedia - hard deletes old document and chunks, then re-imports fresh content
-    /// </summary>
-    /// <param name="request">Same request format as AddDocumentFromWikipedia</param>
-    /// <returns>Same response format as AddDocumentFromWikipedia</returns>
-    [HttpPost("documents/wikipedia/edit")]
-    public async Task<ActionResult<AddDocumentFromWikipediaResponseDto>> EditDocumentFromWikipedia(
-        [FromBody] AddDocumentFromWikipediaRequestDto request)
-    {
-        try
-        {
-            _logger.LogInformation("Editing document from Wikipedia: {Name}", request.Name);
-
-            var result = await _adminService.EditDocumentFromWikipediaAsync(request);
-
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
-
-            _logger.LogInformation("Successfully edited document from Wikipedia: {Title}", result.WikipediaTitle);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error editing document from Wikipedia: {Name}", request.Name);
-            return BadRequest(new AddDocumentFromWikipediaResponseDto
-            {
-                Success = false,
-                Message = $"Error updating document: {ex.Message}"
-            });
-        }
-    }
-
-    #endregion
 }
 
