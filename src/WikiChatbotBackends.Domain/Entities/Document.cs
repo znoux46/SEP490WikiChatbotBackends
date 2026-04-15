@@ -30,4 +30,6 @@ public class Document
     public Guid? CategoryId { get; set; }
     [Column("description")]
     public string? Description { get; set; }
+    [Column("wikipedia_url")]
+    public string? WikipediaUrl { get; set;}
 }

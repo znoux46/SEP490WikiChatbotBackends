@@ -109,7 +109,7 @@ public class DetailService : IDetailService
                 Id = document.Id,
                 Title = document.FileName,
                 Content = document.Description ?? string.Empty,
-                WikipediaUrl = null,
+                WikipediaUrl = document.WikipediaUrl,
                 CategoryId = document.CategoryId ?? Guid.Empty,
                 CategoryName = string.Empty,
                 CreatedAt = document.CreatedAt
@@ -133,7 +133,7 @@ public class DetailService : IDetailService
                 Id = d.Id,
                 Title = d.FileName,
                 Content = d.Description ?? string.Empty,
-                WikipediaUrl = null,
+                WikipediaUrl = d.WikipediaUrl,
                 CategoryId = d.CategoryId ?? Guid.Empty,
                 CategoryName = string.Empty,
                 CreatedAt = d.CreatedAt
