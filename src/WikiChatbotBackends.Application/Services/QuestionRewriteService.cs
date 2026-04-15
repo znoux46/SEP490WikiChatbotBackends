@@ -80,7 +80,10 @@ public class QuestionRewriteService : IQuestionRewriteService
             return question;
         }
         var activePerson = session.ActivePerson;
-
+        if (string.IsNullOrEmpty(activePerson))
+        {
+            return question;
+        }
         var normalized = NormalizeSpaces(question);
 
         // Nếu câu đã có tên người rõ ràng thì giữ nguyên

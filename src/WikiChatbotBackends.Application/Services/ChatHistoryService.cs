@@ -240,7 +240,7 @@ public class ChatHistoryService : IChatHistoryService
         int userId = 0;
         // 1. Lấy UserId từ Claims (nếu không có thì mặc định là 0 hoặc xử lý tùy ý)
         var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out int parsedId))
+        if (int.TryParse(userIdClaim, out int parsedId))
         {
             // Nếu bạn muốn cho phép lưu lịch sử cho khách (Anonymous), 
             // bạn cần một UserId mặc định hoặc bỏ qua logic này.

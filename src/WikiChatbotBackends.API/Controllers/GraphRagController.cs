@@ -56,7 +56,7 @@ public class GraphRagController : ControllerBase
                 result.Question, 
                 result.Answer, 
                 "GraphRAG",
-                result.ActivePerson, 
+                result.Active_Person, 
                 request.SessionId);
 
             // Cập nhật lại SessionId vào kết quả trả về
