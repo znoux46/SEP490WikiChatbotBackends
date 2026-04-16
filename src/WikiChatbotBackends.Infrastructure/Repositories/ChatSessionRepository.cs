@@ -12,17 +12,21 @@ public class ChatSessionRepository : Repository<ChatSession>, IChatSessionReposi
     {
     }
 
-    public async Task<IEnumerable<ChatSession>> GetChatSessionsAsync(
+public async Task<IEnumerable<ChatSession>> GetChatSessionsAsync(
         Expression<Func<ChatSession, bool>>? predicate = null,
         Func<IQueryable<ChatSession>, IOrderedQueryable<ChatSession>>? orderBy = null,
         int? skip = null,
         int? take = null,
-        bool includeUser = false)
+        bool includeUser = false,
+        bool includeHistories = false)
     {
         IQueryable<ChatSession> query = _dbSet;
 
         if (includeUser)
             query = query.Include(s => s.User);
+
+        if (includeHistories)
+            query = query.Include(s => s.ChatHistories);
 
         if (predicate != null)
             query = query.Where(predicate);
