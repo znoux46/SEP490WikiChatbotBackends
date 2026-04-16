@@ -3,10 +3,12 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 using HtmlAgilityPack;
+using Microsoft.EntityFrameworkCore;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
 using System.Linq;
+using System.Linq.Expressions;
 
 namespace WikiChatbotBackends.Application.Services;
 
@@ -39,84 +41,71 @@ public class AdminService : IAdminService
 
     public async Task<PagedResultDto<AdminUserDto>> GetAllUsersAsync(UserQueryDto query)
     {
-        // Build predicate for filtering
-        Func<User, bool>? predicate = null;
-        if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+        // Build simple server-side predicate (no complex combining)
+        Expression<Func<User, bool>>? predicate = null;
+        bool hasSearch = !string.IsNullOrWhiteSpace(query.SearchTerm);
+        bool hasRole = !string.IsNullOrWhiteSpace(query.Role);
+
+        if (hasSearch && hasRole)
         {
-            var searchTerm = query.SearchTerm.ToLower();
+            var searchTerm = query.SearchTerm!.ToLowerInvariant();
             predicate = u => 
-                u.Username.ToLower().Contains(searchTerm) ||
-                u.Email.ToLower().Contains(searchTerm) ||
-                u.FullName.ToLower().Contains(searchTerm);
+                EF.Functions.Like(u.Username.ToLowerInvariant(), $"%{searchTerm}%") ||
+                EF.Functions.Like(u.Email.ToLowerInvariant(), $"%{searchTerm}%") ||
+                EF.Functions.Like(u.FullName.ToLowerInvariant(), $"%{searchTerm}%") &&
+                u.Role == query.Role;
+        }
+        else if (hasSearch)
+        {
+            var searchTerm = query.SearchTerm!.ToLowerInvariant();
+            predicate = u => 
+                EF.Functions.Like(u.Username.ToLowerInvariant(), $"%{searchTerm}%") ||
+                EF.Functions.Like(u.Email.ToLowerInvariant(), $"%{searchTerm}%") ||
+                EF.Functions.Like(u.FullName.ToLowerInvariant(), $"%{searchTerm}%");
+        }
+        else if (hasRole)
+        {
+            predicate = u => u.Role == query.Role;
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Role))
-        {
-            var role = query.Role;
-            if (predicate != null)
-            {
-                var existingPredicate = predicate;
-                predicate = u => existingPredicate(u) && u.Role == role;
-            }
-            else
-            {
-                predicate = u => u.Role == role;
-            }
-        }
+        // Get total count (server-side)
+        var totalCount = predicate != null 
+            ? await _userRepository.CountUsersAsync(predicate) 
+            : await _userRepository.CountUsersAsync();
 
-        // Get total count
-        int totalCount;
-        if (predicate != null)
-        {
-            totalCount = await _userRepository.CountUsersAsync(u => predicate(u));
-        }
-        else
-        {
-            totalCount = await _userRepository.CountUsersAsync();
-        }
+        // Build server-side ordering
+        Func<IQueryable<User>, IOrderedQueryable<User>>? orderBy = null;
+        bool sortDesc = !(query.SortDescending.HasValue && !query.SortDescending.Value);
+        string sortBy = (query.SortBy ?? "createdat").ToLower();
 
-        // Get users with sorting
-        var users = await _userRepository.GetAllAsync();
-        var filteredUsers = predicate != null ? users.Where(predicate) : users;
-
-        // Apply sorting
-        var sortedUsers = query.SortBy?.ToLower() switch
+        orderBy = sortBy switch
         {
-            "username" => query.SortDescending 
-                ? filteredUsers.OrderByDescending(u => u.Username) 
-                : filteredUsers.OrderBy(u => u.Username),
-            "email" => query.SortDescending 
-                ? filteredUsers.OrderByDescending(u => u.Email) 
-                : filteredUsers.OrderBy(u => u.Email),
-            "role" => query.SortDescending 
-                ? filteredUsers.OrderByDescending(u => u.Role) 
-                : filteredUsers.OrderBy(u => u.Role),
-            "updatedat" => query.SortDescending 
-                ? filteredUsers.OrderByDescending(u => u.UpdatedAt) 
-                : filteredUsers.OrderBy(u => u.UpdatedAt),
-            _ => filteredUsers.OrderByDescending(u => u.CreatedAt)
+            "username" => sortDesc ? q => q.OrderByDescending(u => u.Username) : q => q.OrderBy(u => u.Username),
+            "email" => sortDesc ? q => q.OrderByDescending(u => u.Email) : q => q.OrderBy(u => u.Email),
+            "role" => sortDesc ? q => q.OrderByDescending(u => u.Role) : q => q.OrderBy(u => u.Role),
+            "updatedat" => sortDesc ? q => q.OrderByDescending(u => u.UpdatedAt) : q => q.OrderBy(u => u.UpdatedAt),
+            _ => sortDesc ? q => q.OrderByDescending(u => u.CreatedAt) : q => q.OrderBy(u => u.CreatedAt)
         };
 
-        // Apply pagination
-        var items = sortedUsers
-            .Skip((query.PageNumber - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .Select(u => new AdminUserDto
-            {
-                Id = u.Id,
-                Username = u.Username,
-                Email = u.Email,
-                FullName = u.FullName,
-                AvatarUrl = u.AvatarUrl,
-                Role = u.Role,
-                CreatedAt = u.CreatedAt,
-                UpdatedAt = u.UpdatedAt
-            })
-            .ToList();
+        // Server-side query with filter/sort/pagination
+        var skip = (query.PageNumber - 1) * query.PageSize;
+        var items = await _userRepository.GetUsersAsync(predicate, orderBy, skip, query.PageSize);
+
+        var dtos = items.Select(u => new AdminUserDto
+        {
+            Id = u.Id,
+            Username = u.Username,
+            Email = u.Email,
+            FullName = u.FullName,
+            AvatarUrl = u.AvatarUrl,
+            Role = u.Role,
+            CreatedAt = u.CreatedAt,
+            UpdatedAt = u.UpdatedAt
+        }).ToList();
 
         return new PagedResultDto<AdminUserDto>
         {
-            Items = items,
+            Items = dtos,
             TotalCount = totalCount,
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -195,6 +184,8 @@ public class AdminService : IAdminService
         await _userRepository.DeleteAsync(user);
         return true;
     }
+
+
 
     public async Task<AdminUserDto> UpdateUserRoleAsync(int userId, string role)
     {
@@ -302,10 +293,10 @@ public class AdminService : IAdminService
         var users = await _userRepository.GetAllAsync();
         
         // Get message counts by user
-        var messageCounts = await _chatHistoryRepository.GetMessageCountByUserAsync(startDate, endDate);
+        var messageCounts = await _chatHistoryRepository.GetMessageCountByUserAsync(startDate, endDate) ?? new Dictionary<int, int>();
         
         // Get session counts by user
-        var sessionCounts = await _userRepository.GetSessionCountByUserAsync(startDate, endDate);
+        var sessionCounts = await _userRepository.GetSessionCountByUserAsync(startDate, endDate) ?? new Dictionary<int, int>();
 
         // Build active user list
         var activeUsers = users.Select(u => new ActiveUserDto
