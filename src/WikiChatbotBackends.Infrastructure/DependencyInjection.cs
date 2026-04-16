@@ -44,6 +44,10 @@ public static class DependencyInjection
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IDetailService, DetailService>();
 
+        // OTP and Email Services
+        services.AddScoped<IOtpService, OtpService>();
+        services.AddScoped<IEmailService, EmailService>(); // Use EmailService with Gmail SMTP
+
         // RAG Service with HttpClient
         services.AddHttpClient<IRagService, RagService>();
 
