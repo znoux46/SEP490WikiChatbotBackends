@@ -49,7 +49,7 @@ public class UserQueryDto
     public string? SearchTerm { get; set; }
     public string? Role { get; set; }
     public string? SortBy { get; set; } = "CreatedAt";
-    public bool SortDescending { get; set; } = true;
+    public bool? SortDescending { get; set; } = true;
 }
 
 public class PagedResultDto<T>
