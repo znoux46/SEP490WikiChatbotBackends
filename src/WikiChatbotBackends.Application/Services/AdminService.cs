@@ -555,15 +555,15 @@ public class AdminService : IAdminService
             
             var sb = new StringBuilder();
             int paraCount = 0;
-            foreach (var p in paragraphs.Take(10)) // Take more paras for better summary
+            foreach (var p in paragraphs) // Take more paras for better summary
             {
                 var text = p.InnerText?.Trim();
-                if (!string.IsNullOrWhiteSpace(text) && text.Length > 20) // Skip very short paras
-                {
+                // if (!string.IsNullOrWhiteSpace(text) && text.Length > 20) // Skip very short paras
+                // {
                     sb.AppendLine(text);
                     paraCount++;
-                    if (sb.Length > 5000) break; // Limit total length
-                }
+                    // if (sb.Length > 50000) break; // Limit total length
+                // }
             }
             
             _logger.LogInformation("Built summary from {ParaCount} paragraphs ({Length} chars)", paraCount, sb.Length);
