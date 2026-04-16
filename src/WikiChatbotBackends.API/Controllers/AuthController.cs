@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
+using WikiChatbotBackends.Domain.Entities;
 
 namespace WikiChatbotBackends.API.Controllers;
 
@@ -11,10 +12,12 @@ namespace WikiChatbotBackends.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IRepository<User> _userRepository;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IRepository<User> userRepository)
     {
         _authService = authService;
+        _userRepository = userRepository;
     }
 
     [HttpPost("register")]
@@ -69,6 +72,99 @@ public class AuthController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ForgotPasswordResponseDto>> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        try
+        {
+            var otp = await _authService.ForgotPasswordAsync(dto.Email);
+            return Ok(new ForgotPasswordResponseDto
+            {
+                Success = true,
+                Message = "If an account with this email exists, an OTP has been sent."
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Ok(new ForgotPasswordResponseDto
+            {
+                Success = true,
+                Message = "If an account with this email exists, an OTP has been sent."
+            }); // Don't reveal if email exists
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("verify-otp")]
+    [AllowAnonymous]
+    public async Task<ActionResult<VerifyOtpResponseDto>> VerifyOtp([FromBody] VerifyOtpDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Otp))
+                return BadRequest(new { message = "Email and OTP are required" });
+
+            // Get user by email to get userId
+            var users = await _userRepository.FindAsync(u => u.Email == dto.Email);
+            var user = users.FirstOrDefault();
+            
+            if (user == null)
+                return Unauthorized(new { message = "Invalid email or OTP" });
+
+            var resetToken = await _authService.VerifyOtpAsync(user.Id, dto.Otp);
+            if (string.IsNullOrEmpty(resetToken))
+                return Unauthorized(new { message = "Invalid or expired OTP" });
+
+            return Ok(new VerifyOtpResponseDto
+            {
+                ResetToken = resetToken,
+                Message = "OTP verified successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("set-new-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ForgotPasswordResponseDto>> SetNewPassword([FromBody] SetNewPasswordDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.ResetToken) || string.IsNullOrWhiteSpace(dto.NewPassword))
+                return BadRequest(new { message = "Reset token and new password are required" });
+
+            if (dto.NewPassword != dto.ConfirmPassword)
+                return BadRequest(new { message = "Passwords do not match" });
+
+            // Get userId from resetToken via AuthService
+            var result = await _authService.SetNewPasswordAsync(0, dto.ResetToken, dto.NewPassword, dto.ConfirmPassword);
+            
+            if (result)
+                return Ok(new ForgotPasswordResponseDto
+                {
+                    Success = true,
+                    Message = "Password has been reset successfully"
+                });
+            else
+                return Unauthorized(new { message = "Invalid or expired reset token" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
         }
         catch (Exception ex)
         {
