@@ -352,59 +352,74 @@ public class AdminService : IAdminService
     public async Task<PagedResultDto<AdminChatSessionDto>> GetAllChatSessionsAsync(ChatSessionQueryDto query)
     {
         // Get all sessions with user included
-        var allSessions = await _chatSessionRepository.GetChatSessionsAsync(
-            includeUser: true);
+        Expression<Func<ChatSession, bool>>? predicate = null;
+        bool hasUserId = query.UserId.HasValue;
+        bool hasStartDate = query.StartDate.HasValue;
+        bool hasEndDate = query.EndDate.HasValue;
 
-        // Apply filters
-        var filteredSessions = allSessions.AsEnumerable();
-        
-        if (query.UserId.HasValue)
+        if (hasUserId && hasStartDate && hasEndDate)
         {
-            filteredSessions = filteredSessions.Where(s => s.UserId == query.UserId.Value);
+            predicate = s => s.UserId == query.UserId.Value &&
+                s.CreatedAt >= query.StartDate.Value &&
+                s.CreatedAt <= query.EndDate.Value;
+        }
+        else if (hasUserId && hasStartDate)
+        {
+            predicate = s => s.UserId == query.UserId.Value &&
+                s.CreatedAt >= query.StartDate.Value;
+        }
+        else if (hasUserId && hasEndDate)
+        {
+            predicate = s => s.UserId == query.UserId.Value &&
+                s.CreatedAt <= query.EndDate.Value;
+        }
+        else if (hasStartDate && hasEndDate)
+        {
+            predicate = s => s.CreatedAt >= query.StartDate.Value &&
+                s.CreatedAt <= query.EndDate.Value;
+        }
+        else if (hasUserId)
+        {
+            predicate = s => s.UserId == query.UserId.Value;
+        }
+        else if (hasStartDate)
+        {
+            predicate = s => s.CreatedAt >= query.StartDate.Value;
+        }
+        else if (hasEndDate)
+        {
+            predicate = s => s.CreatedAt <= query.EndDate.Value;
         }
 
-        if (query.StartDate.HasValue)
-        {
-            filteredSessions = filteredSessions.Where(s => s.CreatedAt >= query.StartDate.Value);
-        }
+        var totalCount = predicate != null 
+            ? await _chatSessionRepository.CountChatSessionsAsync(predicate) 
+            : await _chatSessionRepository.CountChatSessionsAsync();
 
-        if (query.EndDate.HasValue)
-        {
-            filteredSessions = filteredSessions.Where(s => s.CreatedAt <= query.EndDate.Value);
-        }
+        Func<IQueryable<ChatSession>, IOrderedQueryable<ChatSession>>? orderBy = null;
+        bool sortDesc = query.SortDescending;
+        string sortBy = (query.SortBy ?? "createdat").ToLower();
 
-        // Apply sorting
-        var sortedSessions = query.SortBy?.ToLower() switch
+        orderBy = sortBy switch
         {
-            "sessionname" => query.SortDescending 
-                ? filteredSessions.OrderByDescending(s => s.SessionName) 
-                : filteredSessions.OrderBy(s => s.SessionName),
-            "userid" => query.SortDescending 
-                ? filteredSessions.OrderByDescending(s => s.UserId) 
-                : filteredSessions.OrderBy(s => s.UserId),
-            "updatedat" => query.SortDescending 
-                ? filteredSessions.OrderByDescending(s => s.UpdatedAt) 
-                : filteredSessions.OrderBy(s => s.UpdatedAt),
-            _ => filteredSessions.OrderByDescending(s => s.CreatedAt)
+            "sessionname" => sortDesc ? q => q.OrderByDescending(s => s.SessionName) : q => q.OrderBy(s => s.SessionName),
+            "userid" => sortDesc ? q => q.OrderByDescending(s => s.UserId) : q => q.OrderBy(s => s.UserId),
+            "updatedat" => sortDesc ? q => q.OrderByDescending(s => s.UpdatedAt) : q => q.OrderBy(s => s.UpdatedAt),
+            _ => sortDesc ? q => q.OrderByDescending(s => s.CreatedAt) : q => q.OrderBy(s => s.CreatedAt)
         };
 
-        var totalCount = sortedSessions.Count();
+        var skip = (query.PageNumber - 1) * query.PageSize;
+        var sessions = await _chatSessionRepository.GetChatSessionsAsync(predicate, orderBy, skip, query.PageSize, true, true);
 
-        // Apply pagination
-        var items = sortedSessions
-            .Skip((query.PageNumber - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .Select(s => new AdminChatSessionDto
-            {
-                UserId = s.UserId,
-                Username = s.User?.Username ?? "Unknown",
-                SessionId = s.SessionId.ToString(),
-                SessionName = s.SessionName,
-                MessageCount = s.ChatHistories?.Count ?? 0,
-                CreatedAt = s.CreatedAt,
-                UpdatedAt = s.UpdatedAt
-            })
-            .ToList();
+        var items = sessions.Select(s => new AdminChatSessionDto
+        {
+            UserId = s.UserId,
+            Username = s.User?.Username ?? "Unknown",
+            SessionId = s.SessionId.ToString(),
+            SessionName = s.SessionName,
+            MessageCount = s.ChatHistories.Count,
+            CreatedAt = s.CreatedAt,
+            UpdatedAt = s.UpdatedAt
+        }).ToList();
 
         return new PagedResultDto<AdminChatSessionDto>
         {
