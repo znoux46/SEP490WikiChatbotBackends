@@ -45,6 +45,10 @@ public static class DependencyInjection
         services.AddScoped<IDetailService, DetailService>();
         services.AddScoped<IQuestionRewriteService, QuestionRewriteService>();
 
+        // OTP and Email Services
+        services.AddScoped<IOtpService, OtpService>();
+        services.AddScoped<IEmailService, EmailService>(); // Use EmailService with Gmail SMTP
+
         // RAG Service with HttpClient
         services.AddHttpClient<IRagService, RagService>();
 

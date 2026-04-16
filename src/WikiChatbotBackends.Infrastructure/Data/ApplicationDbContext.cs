@@ -12,8 +12,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<ChatSession> ChatSessions { get; set; }
     public DbSet<ChatHistory> ChatHistories { get; set; }
-    
     public DbSet<Category> Categories { get; set; }
+    public DbSet<Detail> Details { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<Document> Documents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -89,6 +90,20 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.CategoryId);
             entity.HasIndex(e => e.FileName);
             entity.HasIndex(e => e.Status);
+        });
+
+        // PasswordReset configuration
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Otp).HasMaxLength(10);
+            entity.Property(e => e.ResetToken).HasMaxLength(256);
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.PasswordResetTokens)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.ResetToken);
         });
     }
 }
