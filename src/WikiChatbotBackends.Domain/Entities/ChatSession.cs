@@ -4,7 +4,8 @@ public class ChatSession
 {
     public Guid SessionId { get; set; }
     public int UserId { get; set; }
-    public string SessionName { get; set; } = string.Empty; 
+    public string SessionName { get; set; } = string.Empty;
+    public string ActivePerson { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

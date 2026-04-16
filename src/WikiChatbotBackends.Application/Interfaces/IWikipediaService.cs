@@ -23,5 +23,7 @@ public interface IWikipediaService
     /// <param name="limit">Maximum results (default: 10)</param>
     /// <returns>List of search results</returns>
     Task<List<WikipediaSearchResult>> SearchAsync(string query, string language = "en", int limit = 10);
+
+    Task<WikipediaFullContentResponse?> GetArticleFullContentAsync(string title, string language = "en");
 }
 

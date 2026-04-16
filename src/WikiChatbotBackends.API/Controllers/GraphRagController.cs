@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.Text.Json;
+using WikiChatbotBackends.Application.DTOs;
+using WikiChatbotBackends.Application.Interfaces;
 
 namespace WikiChatbotBackends.API.Controllers;
 
@@ -10,78 +8,88 @@ namespace WikiChatbotBackends.API.Controllers;
 [Route("api/graphrag")]
 public class GraphRagController : ControllerBase
 {
-    private readonly HttpClient _httpClient;
+    private readonly IRagService _ragService;
+    private readonly IChatHistoryService _chatHistoryService;
+    private readonly IQuestionRewriteService _questionRewriteService;
     private readonly ILogger<GraphRagController> _logger;
 
-private readonly IConfiguration _configuration;
-public GraphRagController(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<GraphRagController> logger)
+    public GraphRagController(IRagService ragService,
+        IChatHistoryService chatHistoryService,
+        IQuestionRewriteService questionRewriteService,
+        ILogger<GraphRagController> logger)
     {
-        _httpClient = httpClientFactory.CreateClient();
-_httpClient.BaseAddress = new Uri(_configuration["RagService:BaseUrl"] ?? "http://localhost:8000");
+        _ragService = ragService;
         _logger = logger;
+        _chatHistoryService = chatHistoryService;
+        _questionRewriteService = questionRewriteService;
     }
 
     /// <summary>
-    /// 3. POST /chat - Graph RAG Query
+    /// GraphRAG chat endpoint - proxies to model /chat, saves to chat history if SessionId provided
     /// </summary>
     [HttpPost("chat")]
-    public async Task<ActionResult> Chat([FromBody] object request)
+    public async Task<ActionResult<ChatResponse>> Chat([FromBody] ChatRequest request)
     {
+        string originalQuestion = request.Question;
+        
         try
         {
-            _logger.LogInformation("GraphRAG chat");
-            var response = await _httpClient.PostAsJsonAsync("/chat", request);
-            response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            string displayQuestion = request.Question;
+            
+            _logger.LogInformation("GraphRAG chat request: {Question} (SessionId: {SessionId})", request.Question, request.SessionId);
+
+            // Rewrite question
+            var rewrittenQuestion = await _questionRewriteService.RewriteQuestion(originalQuestion, request.SessionId);
+            request.Question = rewrittenQuestion;            
+            
+            // Call GraphRAG service
+            var result = await _ragService.GraphRagChatAsync(request);
+
+            result.Question = originalQuestion;
+            result.AIModel = "GraphRAG"; // Indicate which model was used
+
+            // // Save history
+            // result.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, result.Answer, "GraphRAG",result.ActivePerson, request.SessionId);
+
+            // 4. Lưu history và lấy SessionId chuẩn (Xử lý được cả vụ Anonymous)
+            var finalSessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(
+                result.Question, 
+                result.Answer, 
+                "GraphRAG",
+                result.Active_Person, 
+                request.SessionId);
+
+            // Cập nhật lại SessionId vào kết quả trả về
+            result.SessionId = finalSessionId;
+
             return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GraphRAG chat failed");
-            return StatusCode(500, new { message = ex.Message });
+            // _logger.LogError(ex, "Error in GraphRAG chat");
+            // return StatusCode(500, new GraphRagChatResponseDto { Success = false, Error = ex.Message });
+
+            _logger.LogError(ex, "Error in GraphRAG chat");
+            // Đảm bảo DTO trả về đồng nhất để Frontend không bị parse lỗi
+            return StatusCode(500, new ChatResponse { 
+                Answer = "Có lỗi xảy ra khi xử lý GraphRAG: " + ex.Message,
+                Question = originalQuestion,
+                SessionId = request.SessionId.ToString()
+            });
         }
     }
 
-    /// <summary>
-    /// 1. POST /ingest_new proxy
-    /// </summary>
-    [HttpPost("upload")]
-    public async Task<ActionResult> Upload([FromBody] object request)
+    [HttpGet("node-status/{jobId}")]
+    public async Task<IActionResult> GetNodeStatus(string jobId)
     {
-        var response = await _httpClient.PostAsJsonAsync("/ingest_new", request);
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return Ok(result);
-    }
+        var status = await _ragService.GetNodeStatusAsync(jobId);
+        
+        if (status == null)
+        {
+            return NotFound(new { message = $"Không tìm thấy Job ID: {jobId}" });
+        }
 
-    /// <summary>
-    /// 2. POST /migrate_new proxy
-    /// </summary>
-    [HttpPost("migrate/persons")]
-    public async Task<ActionResult> Migrate([FromBody] object request)
-    {
-        var response = await _httpClient.PostAsJsonAsync("/migrate_new", request);
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return Ok(result);
-    }
-
-    [HttpGet("status/{jobId}")]
-    public async Task<ActionResult> Status(string jobId)
-    {
-        var response = await _httpClient.GetAsync($"/status/{jobId}");
-        if (!response.IsSuccessStatusCode) return NotFound();
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return Ok(result);
-    }
-
-    [HttpGet("health")]
-    public async Task<ActionResult> Health()
-    {
-        var response = await _httpClient.GetAsync("/health");
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return Ok(result);
+        // Trả về nguyên văn object DTO khớp hoàn toàn với response từ Python
+        return Ok(status);
     }
 }
-

@@ -284,5 +284,23 @@ public class WikipediaSearchResult
     public string? Thumbnail { get; set; }
 }
 
+/// <summary>
+/// Response from Wikipedia REST API Summary or Mobile-Sections endpoint
+/// </summary>
+public class WikipediaFullContentResponse
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    
+    // Extract: Vẫn giữ để chứa đoạn tóm tắt ngắn (Lead section)
+    public string Extract { get; set; } = string.Empty;
+    
+    // FullContent: Thuộc tính mới để chứa toàn bộ nội dung từ các mục (Sections)
+    public string? FullContent { get; set; } 
+    
+    public string? Timestamp { get; set; }
+    public WikipediaContentUrls? ContentUrls { get; set; }
+}
+
 #endregion
 

@@ -5,10 +5,10 @@ using System.Linq.Expressions;
 
 namespace WikiChatbotBackends.Application.Interfaces;
 
-public interface IDetailRepository : IRepository<Detail>
+public interface IDetailRepository : IRepository<Document>
 {
-    Task<Detail?> GetByIdWithCategoryAsync(Guid id);
-    Task<List<Detail>> GetByCategoryIdWithCategoryAsync(Guid categoryId);
-    Task<Detail?> GetByIdAsync(Guid id);
-    Task<bool> ExistsAsync(Expression<Func<Detail, bool>> predicate);
+    Task<Document?> GetByIdWithCategoryAsync(Guid id);
+    Task<List<Document>> GetByCategoryIdWithCategoryAsync(Guid categoryId);
+    Task<Document?> GetByIdAsync(Guid id);
+        new Task<bool> ExistsAsync(Expression<Func<Document, bool>> predicate);
 }

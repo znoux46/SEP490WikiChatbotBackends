@@ -30,18 +30,23 @@ public class DetailService : IDetailService
             if (string.IsNullOrWhiteSpace(dto.Title))
                 throw new ArgumentException("Title is required");
 
-            var detail = new Detail
+            var document = new Document
             {
                 Id = Guid.NewGuid(),
                 CategoryId = dto.CategoryId,
-                Title = dto.Title,
-                Content = dto.Content,
-                WikipediaUrl = dto.WikipediaUrl,
-                CreatedAt = DateTime.UtcNow
+                FileName = dto.Title,
+                Description = dto.Content,
+                Status = "active",
+                SourceType = "manual",
+                FilePath = "",
+                FileSize = 0,
+                ContentHash = "",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
-            await _detailRepository.AddAsync(detail);
-            return detail.Id;
+            await _detailRepository.AddAsync(document);
+            return document.Id;
         }
         catch (Exception ex)
         {
@@ -54,18 +59,18 @@ public class DetailService : IDetailService
     {
         try
         {
-            var detail = await _detailRepository.GetByIdAsync(id);
-            if (detail == null)
-                throw new KeyNotFoundException($"Detail {id} not found");
+            var document = await _detailRepository.GetByIdAsync(id);
+            if (document == null)
+                throw new KeyNotFoundException($"Document {id} not found");
 
             if (!string.IsNullOrWhiteSpace(dto.Title))
-                detail.Title = dto.Title;
+                document.FileName = dto.Title;
 
             if (!string.IsNullOrWhiteSpace(dto.Content))
-                detail.Content = dto.Content;
+                document.Description = dto.Content;
 
-            detail.WikipediaUrl = dto.WikipediaUrl;
-            await _detailRepository.UpdateAsync(detail);
+            document.UpdatedAt = DateTime.UtcNow;
+            await _detailRepository.UpdateAsync(document);
         }
         catch (Exception ex)
         {
@@ -78,11 +83,11 @@ public class DetailService : IDetailService
     {
         try
         {
-            var detail = await _detailRepository.GetByIdAsync(id);
-            if (detail == null)
-                throw new KeyNotFoundException($"Detail {id} not found");
+            var document = await _detailRepository.GetByIdAsync(id);
+            if (document == null)
+                throw new KeyNotFoundException($"Document {id} not found");
 
-            await _detailRepository.DeleteAsync(detail);
+            await _detailRepository.DeleteAsync(document);
         }
         catch (Exception ex)
         {
@@ -95,19 +100,19 @@ public class DetailService : IDetailService
     {
         try
         {
-            var detail = await _detailRepository.GetByIdWithCategoryAsync(id);
+            var document = await _detailRepository.GetByIdWithCategoryAsync(id);
 
-            if (detail == null) return null;
+            if (document == null) return null;
 
             return new DetailDto
             {
-                Id = detail.Id,
-                Title = detail.Title,
-                Content = detail.Content,
-                WikipediaUrl = detail.WikipediaUrl,
-                CategoryId = detail.CategoryId,
-                CategoryName = detail.Category.Name,
-                CreatedAt = detail.CreatedAt
+                Id = document.Id,
+                Title = document.FileName,
+                Content = document.Description ?? string.Empty,
+                WikipediaUrl = document.WikipediaUrl,
+                CategoryId = document.CategoryId ?? Guid.Empty,
+                CategoryName = string.Empty,
+                CreatedAt = document.CreatedAt
             };
         }
         catch (Exception ex)
@@ -121,16 +126,16 @@ public class DetailService : IDetailService
     {
         try
         {
-            var details = await _detailRepository.GetByCategoryIdWithCategoryAsync(categoryId);
+            var documents = await _detailRepository.GetByCategoryIdWithCategoryAsync(categoryId);
 
-            return details.Select(d => new DetailDto
+            return documents.Select(d => new DetailDto
             {
                 Id = d.Id,
-                Title = d.Title,
-                Content = d.Content,
+                Title = d.FileName,
+                Content = d.Description ?? string.Empty,
                 WikipediaUrl = d.WikipediaUrl,
-                CategoryId = d.CategoryId,
-                CategoryName = d.Category.Name,
+                CategoryId = d.CategoryId ?? Guid.Empty,
+                CategoryName = string.Empty,
                 CreatedAt = d.CreatedAt
             }).ToList();
         }
@@ -149,17 +154,17 @@ public class DetailService : IDetailService
             var allDetails = new List<DetailDto>();
             foreach (var cat in categories)
             {
-                var details = cat.Details.Select(d => new DetailDto
+                var documents = cat.Documents.Select(d => new DetailDto
                 {
                     Id = d.Id,
-                    Title = d.Title,
-                    Content = d.Content,
-                    WikipediaUrl = d.WikipediaUrl,
-                    CategoryId = d.CategoryId,
+                    Title = d.FileName,
+                    Content = d.Description ?? string.Empty,
+                    WikipediaUrl = null,
+                    CategoryId = d.CategoryId ?? Guid.Empty,
                     CategoryName = cat.Name,
                     CreatedAt = d.CreatedAt
                 }).ToList();
-                allDetails.AddRange(details);
+                allDetails.AddRange(documents);
             }
             return allDetails.OrderBy(d => d.CategoryName).ThenBy(d => d.Title).ToList();
         }

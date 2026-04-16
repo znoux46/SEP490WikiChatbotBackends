@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IDetailService, DetailService>();
+        services.AddScoped<IQuestionRewriteService, QuestionRewriteService>();
 
         // OTP and Email Services
         services.AddScoped<IOtpService, OtpService>();

@@ -28,11 +28,11 @@ public class CategoryRepository : Repository<Category>, ICategoryRepository
 
     public async Task<List<Category>> GetAllWithDetailsAsync()
     {
-        return await _dbSet.Include(c => c.Details).OrderBy(c => c.Name).ToListAsync();
+        return await _dbSet.OrderByDescending(c => c.CreatedAt).ToListAsync();
     }
 
     public async Task<List<Category>> GetForLandingAsync(int limit)
     {
-        return await _dbSet.OrderBy(c => c.Name).Take(limit).ToListAsync();
+        return await _dbSet.OrderByDescending(c => c.CreatedAt).Take(limit).ToListAsync();
     }
 }
