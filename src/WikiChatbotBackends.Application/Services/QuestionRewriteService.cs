@@ -30,7 +30,10 @@ public class QuestionRewriteService : IQuestionRewriteService
         "vị này",
         "vị đó",
         "ngài",
-        "ngài ấy"
+        "ngài ấy",
+        "bác",
+        "bác ấy",
+        "chú"
     };
 
     // Các mẫu câu follow-up ngắn, thiếu chủ ngữ
