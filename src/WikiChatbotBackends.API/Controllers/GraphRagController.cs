@@ -48,15 +48,15 @@ public class GraphRagController : ControllerBase
             result.Question = originalQuestion;
             result.AIModel = "GraphRAG"; // Indicate which model was used
 
-            // // Save history
-            // result.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, result.Answer, "GraphRAG",result.ActivePerson, request.SessionId);
+            // Save history
+            result.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, result.Answer, "GraphRAG",result.ActivePerson, request.SessionId);
 
             // 4. Lưu history và lấy SessionId chuẩn (Xử lý được cả vụ Anonymous)
             var finalSessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(
                 result.Question, 
                 result.Answer, 
                 "GraphRAG",
-                result.Active_Person, 
+                result.ActivePerson, 
                 request.SessionId);
 
             // Cập nhật lại SessionId vào kết quả trả về
