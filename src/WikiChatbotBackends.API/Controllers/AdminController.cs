@@ -66,6 +66,25 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// Create user
+    /// </summary>
+    [HttpPost("user")]
+    public async Task<ActionResult<int>> CreateNewUser(CreateUserDto createUser)
+    {
+        try
+        {
+            var userId = await _adminService.CreateUserAsync(createUser);
+
+            return Ok(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error create user {UserName}", createUser.Username);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Update user information
     /// </summary>
     [HttpPut("users/{userId}")]

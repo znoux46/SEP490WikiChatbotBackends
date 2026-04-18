@@ -10,6 +10,7 @@ public interface IAdminService
     Task<AdminUserDto> UpdateUserAsync(int userId, UpdateUserDto dto);
     Task<bool> DeleteUserAsync(int userId);
     Task<AdminUserDto> UpdateUserRoleAsync(int userId, string role);
+    Task<int> CreateUserAsync(CreateUserDto createUser);
 
     // Statistics
     Task<AdminStatsDto> GetStatisticsAsync();

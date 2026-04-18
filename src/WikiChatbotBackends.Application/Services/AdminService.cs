@@ -1,14 +1,16 @@
 
-using Microsoft.Extensions.Logging;
-using System.Text;
-using System.Text.Json;
 using HtmlAgilityPack;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using SendGrid.Helpers.Errors.Model;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
-using System.Linq;
-using System.Linq.Expressions;
 
 namespace WikiChatbotBackends.Application.Services;
 
@@ -215,6 +217,28 @@ public class AdminService : IAdminService
         };
     }
 
+    public async Task<int> CreateUserAsync(CreateUserDto createUser)
+    {
+        var existedUser = await _userRepository.FindAsync(x=>x.Username==createUser.Username);
+        if (existedUser.Any())
+            throw new BadRequestException($"User with username {createUser.Username} already exists");
+        var existedEmail = await _userRepository.FindAsync(x => x.Email == createUser.Email);
+        if (existedEmail.Any())
+            throw new BadRequestException($"User with username {createUser.Username} already exists");
+        var passwordHash = HashPassword(createUser.Password);
+        var newUser = await _userRepository.AddAsync(new User
+        {
+            Username = createUser.Username,
+            Email = createUser.Email,
+            PasswordHash = passwordHash,
+            FullName = createUser.FullName,
+            AvatarUrl = createUser.AvatarUrl,
+            Role = createUser.Role,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        return newUser.Id;
+    }
     #endregion
 
     #region Statistics
@@ -953,6 +977,14 @@ public class AdminService : IAdminService
 
         return progressValue;
     }
+
+    private static string HashPassword(string password)
+    {
+        using var sha256 = SHA256.Create();
+        var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+        return Convert.ToBase64String(hashedBytes);
+    }
+
 }
 
 
