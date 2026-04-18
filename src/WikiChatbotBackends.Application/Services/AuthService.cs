@@ -1,10 +1,12 @@
-﻿using System.Security.Cryptography;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using System.Data.SqlTypes;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
-using Microsoft.Extensions.Logging;
 
 namespace WikiChatbotBackends.Application.Services;
 
@@ -15,19 +17,22 @@ public class AuthService : IAuthService
     private readonly IOtpService _otpService;
     private readonly IEmailService _emailService;
     private readonly ILogger<AuthService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AuthService(
         IRepository<User> userRepository, 
         IJwtService jwtService,
         IOtpService otpService,
         IEmailService emailService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IHttpContextAccessor httpContextAccessor    )
     {
         _userRepository = userRepository;
         _jwtService = jwtService;
         _otpService = otpService;
         _emailService = emailService;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<LoginResponseDto> RegisterAsync(RegisterDto dto)
@@ -219,6 +224,36 @@ public class AuthService : IAuthService
             _logger.LogWarning(ex, "Failed to send password reset confirmation email");
             // Don't throw - password was already reset successfully
         }
+
+        return true;
+    }
+
+    public async Task<bool> ChangePasswordAsync(string oldPassword, string newPassword, string confirmPassword)
+    {
+        // Validate passwords match
+        if (newPassword != confirmPassword)
+            throw new InvalidOperationException("Confirm password does not match");
+
+        // Validate password strength
+        if (newPassword.Length < 8)
+            throw new InvalidOperationException("Password must be at least 8 characters long");
+        var httpContext = _httpContextAccessor.HttpContext;
+        var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        int userId = 0;
+        if (!int.TryParse(userIdClaim, out userId))
+        {
+            // Nếu bạn muốn cho phép lưu lịch sử cho khách (Anonymous), 
+            // bạn cần một UserId mặc định hoặc bỏ qua logic này.
+            // userId = 0;
+            throw new UnauthorizedAccessException("Invalid token");
+        }
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null || !VerifyPassword(oldPassword, user.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid old password");
+        // Update password
+        user.PasswordHash = HashPassword(newPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user);
 
         return true;
     }

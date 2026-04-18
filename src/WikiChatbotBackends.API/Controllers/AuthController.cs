@@ -181,4 +181,23 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<UserDto>> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        try
+        {
+            var user = await _authService.ChangePasswordAsync(dto.OldPassword,dto.NewPassword,dto.ConfirmPassword);
+            return Ok(user);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

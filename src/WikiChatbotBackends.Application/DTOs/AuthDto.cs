@@ -14,6 +14,13 @@ public class LoginDto
     public string Password { get; set; } = string.Empty;
 }
 
+public class ChangePasswordDto
+{
+    public string OldPassword { get; set; } = string.Empty;
+    public string NewPassword { get; set; } = string.Empty;
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+
 public class LoginResponseDto
 {
     public string Token { get; set; } = string.Empty;

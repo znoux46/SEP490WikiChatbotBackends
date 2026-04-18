@@ -224,7 +224,7 @@ public class AdminService : IAdminService
             throw new BadRequestException($"User with username {createUser.Username} already exists");
         var existedEmail = await _userRepository.FindAsync(x => x.Email == createUser.Email);
         if (existedEmail.Any())
-            throw new BadRequestException($"User with username {createUser.Username} already exists");
+            throw new BadRequestException($"User with email {createUser.Email} already exists");
         var passwordHash = HashPassword(createUser.Password);
         var newUser = await _userRepository.AddAsync(new User
         {
