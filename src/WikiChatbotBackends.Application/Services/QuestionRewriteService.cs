@@ -33,7 +33,8 @@ public class QuestionRewriteService : IQuestionRewriteService
         "ngài ấy",
         "bác",
         "bác ấy",
-        "chú"
+        "chú",
+        "chú ấy"
     };
 
     // Các mẫu câu follow-up ngắn, thiếu chủ ngữ
@@ -224,6 +225,10 @@ public class QuestionRewriteService : IQuestionRewriteService
         rewritten = Regex.Replace(rewritten, @"\bbà\b", activePerson, RegexOptions.IgnoreCase);
         rewritten = Regex.Replace(rewritten, @"\ngài\b", activePerson, RegexOptions.IgnoreCase);
         rewritten = Regex.Replace(rewritten, @"\ngài ấy\b", activePerson, RegexOptions.IgnoreCase);
+        rewritten = Regex.Replace(rewritten, @"\bác\b", activePerson, RegexOptions.IgnoreCase);
+        rewritten = Regex.Replace(rewritten, @"\bác ấy\b", activePerson, RegexOptions.IgnoreCase);
+        rewritten = Regex.Replace(rewritten, @"\chú\b", activePerson, RegexOptions.IgnoreCase);
+        rewritten = Regex.Replace(rewritten, @"\chú ấy\b", activePerson, RegexOptions.IgnoreCase);
         return rewritten;
     }
 
