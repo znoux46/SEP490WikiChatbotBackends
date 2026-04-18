@@ -30,9 +30,9 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = session.SessionId,
             SessionName = session.SessionName,
-            ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
             LastMessageAt = session.UpdatedAt,
+            ActivePerson = session.ActivePerson,
             MessageCount = session.ChatHistories.Count
         }).OrderByDescending(s => s.LastMessageAt);
     }
@@ -48,7 +48,6 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = session.SessionId,
             SessionName = session.SessionName,
-            ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
             UpdatedAt = session.UpdatedAt
         };
@@ -61,7 +60,6 @@ public class ChatHistoryService : IChatHistoryService
             UserId = userId,
             SessionId = dto.SessionId,
             SessionName = dto.SessionName,
-            ActivePerson= dto.ActivePerson,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -71,7 +69,6 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = created.SessionId,
             SessionName = created.SessionName,
-            ActivePerson = created.ActivePerson,
             CreatedAt = created.CreatedAt,
             UpdatedAt = created.UpdatedAt
         };
@@ -92,7 +89,6 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = session.SessionId,
             SessionName = session.SessionName,
-            ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
             UpdatedAt = session.UpdatedAt
         };
