@@ -33,6 +33,7 @@ public class ChatHistoryService : IChatHistoryService
             ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
             LastMessageAt = session.UpdatedAt,
+            ActivePerson = session.ActivePerson,
             MessageCount = session.ChatHistories.Count
         }).OrderByDescending(s => s.LastMessageAt);
     }
