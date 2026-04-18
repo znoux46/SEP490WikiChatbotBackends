@@ -146,7 +146,7 @@ public class AuthService : IAuthService
         if (string.IsNullOrWhiteSpace(email))
             throw new InvalidOperationException("Email không được để trống.");
 
-        if (!IsValidGmailAddress(email))
+        if (!IsValidEmail(email))
             throw new InvalidOperationException("Email không hợp lệ");
 
         var users = await _userRepository.FindAsync(u => u.Email == email);
@@ -258,20 +258,14 @@ public class AuthService : IAuthService
         return true;
     }
 
-    private static bool IsValidGmailAddress(string email)
+    private static bool IsValidEmail(string email)
     {
         if (string.IsNullOrWhiteSpace(email))
             return false;
 
-        // Check if email ends with @gmail.com
-        if (!email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase))
-            return false;
+        var emailPattern = @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
 
-        // Validate email format using regex
-        // Gmail username rules: alphanumeric, dots, underscores, hyphens (1-30 chars)
-        // Must not start or end with a dot
-        var gmailPattern = @"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,28}[a-zA-Z0-9]@gmail\.com$|^[a-zA-Z0-9]@gmail\.com$";
-        return Regex.IsMatch(email, gmailPattern);
+        return Regex.IsMatch(email, emailPattern);
     }
 
     private static string HashPassword(string password)
