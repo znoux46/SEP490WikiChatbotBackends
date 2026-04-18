@@ -41,7 +41,7 @@ namespace WikiChatbotBackends.API.Controllers
             // 2. Gọi RAG lấy câu trả lời
             var response = await _ragService.ChatAsync(request);
 
-           response.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer,"RAG", response.ActivePerson, request.SessionId);
+           response.SessionId = await _chatHistoryService.SaveChatHistoryWithContextAsync(request.Question, response.Answer,"RAG", response.Active_Person, request.SessionId);
           
             response.AIModel = "RAG";
             return Ok(response);
