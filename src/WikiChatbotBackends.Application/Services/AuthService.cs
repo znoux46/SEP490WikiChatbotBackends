@@ -1,5 +1,6 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
@@ -135,30 +136,35 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<string> ForgotPasswordAsync(string email)
+    public async Task<string?> ForgotPasswordAsync(string email)
     {
-        // Check if user exists
+        if (string.IsNullOrWhiteSpace(email))
+            throw new InvalidOperationException("Email không được để trống.");
+
+        if (!IsValidGmailAddress(email))
+            throw new InvalidOperationException("Email không hợp lệ");
+
         var users = await _userRepository.FindAsync(u => u.Email == email);
         var user = users.FirstOrDefault();
-        
+
         if (user == null)
-            throw new KeyNotFoundException($"No user found with email: {email}");
+        {
+            _logger.LogWarning($"Email không tồn tại: {email}");
+            return null;
+        }
 
         try
         {
-            // Generate OTP
             var otp = await _otpService.GenerateOtpAsync(user.Id);
-            
-            // Send OTP email
             await _emailService.SendOtpEmailAsync(email, otp, user.FullName);
-            
-            _logger.LogInformation($"OTP sent successfully to {email}");
+
+            _logger.LogInformation($"OTP gửi tới {email}");
             return otp;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Failed to send OTP email to {email}");
-            throw new InvalidOperationException("Failed to send OTP. Please try again later.", ex);
+            _logger.LogError(ex, $"Lỗi gửi OTP {email}");
+            throw;
         }
     }
 
@@ -215,6 +221,22 @@ public class AuthService : IAuthService
         }
 
         return true;
+    }
+
+    private static bool IsValidGmailAddress(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        // Check if email ends with @gmail.com
+        if (!email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Validate email format using regex
+        // Gmail username rules: alphanumeric, dots, underscores, hyphens (1-30 chars)
+        // Must not start or end with a dot
+        var gmailPattern = @"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,28}[a-zA-Z0-9]@gmail\.com$|^[a-zA-Z0-9]@gmail\.com$";
+        return Regex.IsMatch(email, gmailPattern);
     }
 
     private static string HashPassword(string password)
