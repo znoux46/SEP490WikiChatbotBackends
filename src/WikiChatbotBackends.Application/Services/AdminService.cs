@@ -21,6 +21,7 @@ public class AdminService : IAdminService
     private readonly IChatHistoryRepository _chatHistoryRepository;
     private readonly IRagService _ragService;
     private readonly IWikipediaService _wikipediaService;
+    private readonly IDocumentRepository _documentRepository;
     private readonly ILogger<AdminService> _logger;
 
     public AdminService(
@@ -29,6 +30,7 @@ public class AdminService : IAdminService
         IChatHistoryRepository chatHistoryRepository,
         IRagService ragService,
         IWikipediaService wikipediaService,
+        IDocumentRepository documentRepository,
         ILogger<AdminService> logger)
     {
         _userRepository = userRepository;
@@ -36,6 +38,7 @@ public class AdminService : IAdminService
         _chatHistoryRepository = chatHistoryRepository;
         _ragService = ragService;
         _wikipediaService = wikipediaService;
+        _documentRepository = documentRepository;
         _logger = logger;
     }
 
@@ -645,6 +648,24 @@ public class AdminService : IAdminService
                 SourceUrl = sourceUrl,
                 ExtractedDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
             };
+
+            // Auto update document if DocumentId provided
+            if (request.DocumentId.HasValue)
+            {
+                var document = await _documentRepository.GetByIdAsync(request.DocumentId.Value);
+                if (document != null)
+                {
+                    document.Description = data.Summary;
+                    document.WikipediaUrl = data.SourceUrl;
+                    document.UpdatedAt = DateTime.UtcNow;
+                    await _documentRepository.UpdateAsync(document);
+                    _logger.LogInformation("Updated document Description and WikipediaUrl for ID: {DocumentId}", request.DocumentId.Value);
+                }
+                else
+                {
+                    _logger.LogWarning("Document not found for ID: {DocumentId}", request.DocumentId.Value);
+                }
+            }
 
             return new PersonSummaryResponseDto
             {
