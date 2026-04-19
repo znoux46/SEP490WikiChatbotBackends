@@ -15,5 +15,10 @@ public class PersonSummaryRequestDto
     /// Optional Document ID to auto-update description and wikipedia_url after generating summary
     /// </summary>
     public Guid? DocumentId { get; set; }
+
+    /// <summary>
+    /// Optional Category ID to set on document after generating summary
+    /// </summary>
+    public Guid? CategoryId { get; set; }
 }
 

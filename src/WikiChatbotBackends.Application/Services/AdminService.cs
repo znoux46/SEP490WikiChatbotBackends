@@ -657,6 +657,10 @@ public class AdminService : IAdminService
                 {
                     document.Description = data.Summary;
                     document.WikipediaUrl = data.SourceUrl;
+                    if (request.CategoryId.HasValue)
+                    {
+                        document.CategoryId = request.CategoryId.Value;
+                    }
                     document.UpdatedAt = DateTime.UtcNow;
                     await _documentRepository.UpdateAsync(document);
                     _logger.LogInformation("Updated document Description and WikipediaUrl for ID: {DocumentId}", request.DocumentId.Value);
