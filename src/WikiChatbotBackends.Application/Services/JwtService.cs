@@ -13,7 +13,7 @@ public class JwtService : IJwtService
     private readonly string _audience;
     private readonly int _expirationMinutes;
 
-    public JwtService(string secretKey, string issuer, string audience, int expirationMinutes = 60)
+    public JwtService(string secretKey, string issuer, string audience, int expirationMinutes = 1440)
     {
         _secretKey = secretKey;
         _issuer = issuer;
