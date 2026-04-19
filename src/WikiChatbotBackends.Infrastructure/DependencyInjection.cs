@@ -26,8 +26,11 @@ public static class DependencyInjection
         services.AddScoped<IChatSessionRepository, ChatSessionRepository>();
         services.AddScoped<IChatHistoryRepository, ChatHistoryRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
-        services.AddScoped<IDetailRepository, DetailRepository>();
+services.AddScoped<IDetailRepository, DetailRepository>();
         services.AddScoped<IDetailService, DetailService>(); // Auto DI with constructor
+
+        // Document repository
+        services.AddScoped<IDocumentRepository, DocumentRepository>();
 
         // JWT Service
         var jwtSecret = configuration["Jwt:SecretKey"] ?? "YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!";

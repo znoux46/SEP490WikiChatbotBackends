@@ -10,5 +10,10 @@ public class PersonSummaryRequestDto
     public string Language { get; set; } = "vi";
 
     public bool IsAutoSave { get; set; } = false;
+
+    /// <summary>
+    /// Optional Document ID to auto-update description and wikipedia_url after generating summary
+    /// </summary>
+    public Guid? DocumentId { get; set; }
 }
 
