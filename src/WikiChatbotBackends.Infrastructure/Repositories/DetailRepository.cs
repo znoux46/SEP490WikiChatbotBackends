@@ -13,22 +13,28 @@ public class DetailRepository : Repository<Document>, IDetailRepository
     {
     }
 
-    public async Task<Document?> GetByIdWithCategoryAsync(Guid id)
-    {
-        return await _context.Documents.FirstOrDefaultAsync(d => d.Id == id);
-    }
+public async Task<Document?> GetByIdWithCategoryAsync(Guid id)
+{
+    return await _context.Documents
+        .AsNoTracking()
+        .FirstOrDefaultAsync(d => d.Id == id);
+}
 
-    public async Task<List<Document>> GetByCategoryIdWithCategoryAsync(Guid categoryId)
-    {
-        return await _context.Documents.Where(d => d.CategoryId == categoryId)
-            .OrderBy(d => d.FileName)
-            .ToListAsync();
-    }
+public async Task<List<Document>> GetByCategoryIdWithCategoryAsync(Guid categoryId)
+{
+    return await _context.Documents
+        .AsNoTracking()
+        .Where(d => d.CategoryId == categoryId)
+        .OrderBy(d => d.FileName)
+        .ToListAsync();
+}
 
-    public async Task<Document?> GetByIdAsync(Guid id)
-    {
-        return await _context.Documents.FirstOrDefaultAsync(d => d.Id == id);
-    }
+public async Task<Document?> GetByIdAsync(Guid id)
+{
+    return await _context.Documents
+        .AsNoTracking()
+        .FirstOrDefaultAsync(d => d.Id == id);
+}
 
     public async Task<bool> ExistsAsync(Expression<Func<Document, bool>> predicate)
     {
