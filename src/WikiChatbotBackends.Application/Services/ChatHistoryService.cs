@@ -298,20 +298,26 @@ public class ChatHistoryService : IChatHistoryService
                 await _sessionRepository.UpdateAsync(session);
             }
 
-            // // 4. Lưu vào ChatHistory
-            // var history = new ChatHistory
-            // {
-            //     SessionId = sessionIdString,
-            //     Question = question,
-            //     Answer = answer,
-            //     AIModel = AIModel,
-            //     CreatedAt = DateTime.UtcNow,
-            //     UpdatedAt = DateTime.UtcNow
-            // };
+            // 4. Lưu ChatHistory (uncommented & fixed)
+            var history = new ChatHistory
+            {
+                SessionId = sessionIdString,
+                Question = question,
+                Answer = answer,
+                AIModel = AIModel,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _chatHistoryRepository.AddAsync(history);
 
-            // await _chatHistoryRepository.AddAsync(history);
-
-            // return sessionIdString.ToString(); // Trả về SessionId để client có thể sử dụng cho các lần gọi tiếp theo
+            // Update session timestamp
+            var updatedSessions = await _sessionRepository.FindAsync(s => s.SessionId == sessionIdString);
+            if (updatedSessions.Any())
+            {
+                var theSession = updatedSessions.First();
+                theSession.UpdatedAt = DateTime.UtcNow;
+                await _sessionRepository.UpdateAsync(theSession);
+            }
         }
         catch (Exception ex)
         {
