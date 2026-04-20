@@ -653,21 +653,31 @@ public class AdminService : IAdminService
             if (request.DocumentId.HasValue)
             {
                 var document = await _documentRepository.GetByIdAsync(request.DocumentId.Value);
+    
                 if (document != null)
                 {
+                    _logger.LogInformation("Updating existing document ID: {DocumentId}", request.DocumentId.Value);
+                    
                     document.Description = data.Summary;
                     document.WikipediaUrl = data.SourceUrl;
+                    
                     if (request.CategoryId.HasValue)
                     {
                         document.CategoryId = request.CategoryId.Value;
                     }
+                    
                     document.UpdatedAt = DateTime.UtcNow;
-                    await _documentRepository.UpdateAsync(document);
-                    _logger.LogInformation("Updated document Description and WikipediaUrl for ID: {DocumentId}", request.DocumentId.Value);
+                    
+                    // Đảm bảo hàm UpdateAsync này thực hiện lệnh SQL UPDATE, không phải INSERT
+                    await _documentRepository.UpdateAsync(document); 
                 }
                 else
                 {
-                    _logger.LogWarning("Document not found for ID: {DocumentId}", request.DocumentId.Value);
+                    // Nếu không tìm thấy DocumentId, tuyệt đối không tự ý INSERT cái mới ở đây
+                    _logger.LogWarning("Document ID {DocumentId} not found. Skip updating.", request.DocumentId.Value);
+                    
+                    // Bạn có thể trả về lỗi luôn để Frontend biết
+                    return new PersonSummaryResponseDto { Status = "error", Message = "Document không tồn tại để cập nhật." };
                 }
             }
 
