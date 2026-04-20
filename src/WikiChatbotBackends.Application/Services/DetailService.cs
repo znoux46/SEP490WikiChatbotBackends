@@ -30,20 +30,20 @@ public class DetailService : IDetailService
             if (string.IsNullOrWhiteSpace(dto.Title))
                 throw new ArgumentException("Title is required");
 
-            var document = new Document
-            {
-                Id = Guid.NewGuid(),
-                CategoryId = dto.CategoryId,
-                FileName = dto.Title,
-                Description = dto.Content,
-                Status = "active",
-                SourceType = "manual",
-                FilePath = "",
-                FileSize = 0,
-                ContentHash = "",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+var document = new Document
+{
+    Id = Guid.NewGuid(),
+    CategoryId = dto.CategoryId,
+    FileName = dto.Title,
+    Description = dto.Content ?? "Chưa có mô tả nội dung.",
+    Status = "active",
+    SourceType = "manual",
+    FilePath = "",
+    FileSize = 0,
+    ContentHash = "",
+    CreatedAt = DateTime.UtcNow,
+    UpdatedAt = DateTime.UtcNow
+};
 
             await _detailRepository.AddAsync(document);
             return document.Id;

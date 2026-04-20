@@ -12,8 +12,11 @@ public class DocumentRepository : Repository<Document>, IDocumentRepository
     {
     }
 
-    public async Task<Document?> GetByIdAsync(Guid id)
-    {
-        return await _dbSet.FindAsync(id);
-    }
+public async Task<Document?> GetByIdAsync(Guid id)
+{
+    // Thêm AsNoTracking để lấy dữ liệu thực tế từ DB, không dùng bản cache cũ
+    return await _context.Documents
+        .AsNoTracking() 
+        .FirstOrDefaultAsync(d => d.Id == id);
+}
 }
