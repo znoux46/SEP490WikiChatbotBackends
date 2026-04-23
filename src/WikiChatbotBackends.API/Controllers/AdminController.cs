@@ -461,21 +461,58 @@ public class AdminController : ControllerBase
     #region Detail Management
 
     /// <summary>
-    /// Get all details for admin (temporary - use category/details later)
+    /// Get details for admin with pagination and filtering
     /// </summary>
     [HttpGet("details")]
-    public async Task<ActionResult<List<DetailDto>>> GetDetails()
+    public async Task<ActionResult<PagedResultDto<DetailDto>>> GetDetails([FromQuery] DetailQueryDto query)
     {
         try
         {
-            var categories = await _categoryService.GetAllAsync();
-            var allDetails = new List<DetailDto>();
-            foreach (var cat in categories)
+            var pageNumber = query.PageNumber < 1 ? 1 : query.PageNumber;
+            var pageSize = query.PageSize < 1 ? 10 : Math.Min(query.PageSize, 100);
+
+            var details = await _detailService.GetAllAsync();
+            var filtered = details.AsEnumerable();
+
+            if (query.CategoryId.HasValue)
             {
-                var details = await _detailService.GetByCategoryIdAsync(cat.Id);
-                allDetails.AddRange(details);
+                filtered = filtered.Where(d => d.CategoryId == query.CategoryId.Value);
             }
-            return Ok(allDetails);
+
+            if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+            {
+                var keyword = query.SearchTerm.Trim();
+                filtered = filtered.Where(d =>
+                    (d.Title?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (d.Content?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            filtered = (query.SortBy ?? "CreatedAt").ToLowerInvariant() switch
+            {
+                "title" => query.SortDescending
+                    ? filtered.OrderByDescending(d => d.Title)
+                    : filtered.OrderBy(d => d.Title),
+                "categoryname" => query.SortDescending
+                    ? filtered.OrderByDescending(d => d.CategoryName)
+                    : filtered.OrderBy(d => d.CategoryName),
+                _ => query.SortDescending
+                    ? filtered.OrderByDescending(d => d.CreatedAt)
+                    : filtered.OrderBy(d => d.CreatedAt)
+            };
+
+            var totalCount = filtered.Count();
+            var items = filtered
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(new PagedResultDto<DetailDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+            });
         }
         catch (Exception ex)
         {

@@ -180,6 +180,50 @@ namespace WikiChatbotBackends.Infrastructure.Services
             }
         }
 
+        public async Task<EditDocumentJobResponse> EditDocumentAsync(
+            string documentId,
+            Stream fileStream,
+            string fileName,
+            int chunkSize = 800,
+            int chunkOverlap = 150)
+        {
+            try
+            {
+                _logger.LogInformation("Editing document {DocumentId} via RAG service", documentId);
+
+                using var content = new MultipartFormDataContent();
+
+                var streamContent = new StreamContent(fileStream);
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                content.Add(streamContent, "file", fileName);
+                content.Add(new StringContent(chunkSize.ToString()), "chunk_size");
+                content.Add(new StringContent(chunkOverlap.ToString()), "chunk_overlap");
+
+                var response = await _httpClient.PutAsync($"/api/v1/documents/{documentId}/edit", content);
+                response.EnsureSuccessStatusCode();
+
+                var result = await response.Content.ReadFromJsonAsync<EditDocumentJobResponse>();
+
+                if (result == null)
+                {
+                    throw new Exception("Failed to deserialize edit response");
+                }
+
+                _logger.LogInformation("Document edit queued successfully: {DocumentId}", documentId);
+                return result;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "HTTP error while editing document {DocumentId}", documentId);
+                throw new Exception($"Failed to edit document in RAG service: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in EditDocumentAsync for {DocumentId}", documentId);
+                throw;
+            }
+        }
+
         public async Task<List<DocumentInfo>> GetDocumentsAsync(int skip = 0, int limit = 100)
         {
             try

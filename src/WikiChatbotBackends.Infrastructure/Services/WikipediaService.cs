@@ -71,14 +71,14 @@ public class WikipediaService : IWikipediaService
         {
             // 1. QUAN TRỌNG: Wikipedia REST API yêu cầu tiêu đề dùng dấu gạch dưới thay vì khoảng trắng
             var formattedTitle = title.Replace(" ", "_");
-            
+
             // 2. Escape tiêu đề để xử lý tiếng Việt có dấu
             var encodedTitle = Uri.EscapeDataString(formattedTitle);
 
             _logger.LogInformation("Fetching Wikipedia article: {Title} (Formatted: {FormattedTitle})", title, formattedTitle);
 
             var baseUrl = GetWikipediaApiBaseUrl(language);
-            
+
             // Đảm bảo baseUrl kết thúc bằng dấu /
             if (!baseUrl.EndsWith("/")) baseUrl += "/";
             httpClient.BaseAddress = new Uri(baseUrl);
@@ -88,7 +88,7 @@ public class WikipediaService : IWikipediaService
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Wikipedia article not found: {Title} (URL: {Url}, Status: {Status})", 
+                _logger.LogWarning("Wikipedia article not found: {Title} (URL: {Url}, Status: {Status})",
                     title, httpClient.BaseAddress + $"page/summary/{encodedTitle}", response.StatusCode);
                 return null;
             }
@@ -160,15 +160,15 @@ public class WikipediaService : IWikipediaService
             // Format query with underscores like Wikipedia URL
             var formattedQuery = query.Replace(" ", "_");
             var encodedQuery = Uri.EscapeDataString(formattedQuery);
-            
+
             _logger.LogInformation("Searching Wikipedia: {Query} (Formatted: {FormattedQuery}, language: {Language})", query, formattedQuery, language);
 
             // Use the opensearch API for search - it's more reliable
             httpClient.BaseAddress = new Uri($"https://{language}.wikipedia.org/w/api.php");
-            
+
             var response = await httpClient.GetAsync(
                 $"action=opensearch&search={encodedQuery}&limit={limit}&namespace=0&format=json");
-                
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Wikipedia search failed for: {Query} (Status: {Status})", query, response.StatusCode);
@@ -182,6 +182,39 @@ public class WikipediaService : IWikipediaService
         {
             _logger.LogError(ex, "Error searching Wikipedia: {Query}", query);
             return new List<WikipediaSearchResult>();
+        }
+    }
+
+    public async Task<List<WikipediaDocumentSearchItemDto>> SearchDocumentsAsync(string keyword, string language = "vi", int limit = 5)
+    {
+        using var httpClient = CreateHttpClient();
+        try
+        {
+            var safeLanguage = string.IsNullOrWhiteSpace(language) ? "vi" : language.Trim().ToLowerInvariant();
+            var normalizedLimit = Math.Clamp(limit, 1, 20);
+            var encodedKeyword = Uri.EscapeDataString(keyword.Trim());
+
+            var apiUrl =
+                $"https://{safeLanguage}.wikipedia.org/w/api.php" +
+                $"?action=query&generator=search&gsrsearch={encodedKeyword}&gsrlimit={normalizedLimit}" +
+                "&gsrnamespace=0&prop=pageimages|extracts&piprop=thumbnail&pithumbsize=200" +
+                "&exintro&explaintext&exsentences=1&format=json&origin=*";
+
+            var response = await httpClient.GetAsync(apiUrl);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Wikipedia document search failed for: {Keyword} (Status: {Status})", keyword, response.StatusCode);
+                return new List<WikipediaDocumentSearchItemDto>();
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            return ParseDocumentSearchResults(json, safeLanguage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching Wikipedia documents: {Keyword}", keyword);
+            return new List<WikipediaDocumentSearchItemDto>();
         }
     }
 
@@ -202,10 +235,10 @@ public class WikipediaService : IWikipediaService
         {
             // OpenSearch format: [query, [titles], [descriptions], [urls]]
             var results = new List<WikipediaSearchResult>();
-            
+
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             var root = doc.RootElement;
-            
+
             if (root.ValueKind == System.Text.Json.JsonValueKind.Array && root.GetArrayLength() >= 2)
             {
                 var titles = root[1];
@@ -225,7 +258,7 @@ public class WikipediaService : IWikipediaService
                     {
                         desc = descriptions[index].GetString();
                     }
-                    
+
                     var result = new WikipediaSearchResult
                     {
                         Title = title.GetString() ?? string.Empty,
@@ -235,13 +268,80 @@ public class WikipediaService : IWikipediaService
                     index++;
                 }
             }
-            
+
             return results;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error parsing OpenSearch results");
             return new List<WikipediaSearchResult>();
+        }
+    }
+
+    private List<WikipediaDocumentSearchItemDto> ParseDocumentSearchResults(string json, string language)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("query", out var queryElement)
+                || !queryElement.TryGetProperty("pages", out var pagesElement)
+                || pagesElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                return new List<WikipediaDocumentSearchItemDto>();
+            }
+
+            var rawItems = new List<(int Index, WikipediaDocumentSearchItemDto Item)>();
+
+            foreach (var pageProperty in pagesElement.EnumerateObject())
+            {
+                var page = pageProperty.Value;
+                var index = page.TryGetProperty("index", out var indexElement) && indexElement.TryGetInt32(out var parsedIndex)
+                    ? parsedIndex
+                    : int.MaxValue;
+
+                var pageId = page.TryGetProperty("pageid", out var pageIdElement) && pageIdElement.TryGetInt32(out var parsedPageId)
+                    ? parsedPageId
+                    : 0;
+
+                var title = page.TryGetProperty("title", out var titleElement)
+                    ? titleElement.GetString() ?? string.Empty
+                    : string.Empty;
+
+                var extract = page.TryGetProperty("extract", out var extractElement)
+                    ? extractElement.GetString()
+                    : null;
+
+                string? thumbnailUrl = null;
+                if (page.TryGetProperty("thumbnail", out var thumbnailElement)
+                    && thumbnailElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && thumbnailElement.TryGetProperty("source", out var sourceElement))
+                {
+                    thumbnailUrl = sourceElement.GetString();
+                }
+
+                rawItems.Add((index, new WikipediaDocumentSearchItemDto
+                {
+                    PageId = pageId,
+                    Title = title,
+                    Extract = extract,
+                    ThumbnailUrl = thumbnailUrl,
+                    PageUrl = pageId > 0
+                        ? $"https://{language}.wikipedia.org/?curid={pageId}"
+                        : string.Empty
+                }));
+            }
+
+            return rawItems
+                .OrderBy(x => x.Index)
+                .Select(x => x.Item)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing Wikipedia document search results");
+            return new List<WikipediaDocumentSearchItemDto>();
         }
     }
 }

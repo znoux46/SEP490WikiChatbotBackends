@@ -105,6 +105,24 @@ namespace WikiChatbotBackends.Application.DTOs
         public string Message { get; set; } = string.Empty;
     }
 
+    public class EditDocumentJobResponse
+    {
+        [JsonPropertyName("job_id")]
+        public string JobId { get; set; } = string.Empty;
+
+        [JsonPropertyName("document_id")]
+        public string DocumentId { get; set; } = string.Empty;
+
+        [JsonPropertyName("file_name")]
+        public string FileName { get; set; } = string.Empty;
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+    }
+
     // ============================================================================
     // DOCUMENT INFO
     // ============================================================================

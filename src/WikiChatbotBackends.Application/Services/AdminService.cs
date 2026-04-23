@@ -22,6 +22,7 @@ public class AdminService : IAdminService
     private readonly IRagService _ragService;
     private readonly IWikipediaService _wikipediaService;
     private readonly IDocumentRepository _documentRepository;
+    private readonly IDocumentQueueService? _documentQueueService;
     private readonly ILogger<AdminService> _logger;
 
     public AdminService(
@@ -31,7 +32,8 @@ public class AdminService : IAdminService
         IRagService ragService,
         IWikipediaService wikipediaService,
         IDocumentRepository documentRepository,
-        ILogger<AdminService> logger)
+        ILogger<AdminService> logger,
+        IDocumentQueueService? documentQueueService = null)
     {
         _userRepository = userRepository;
         _chatSessionRepository = chatSessionRepository;
@@ -39,6 +41,7 @@ public class AdminService : IAdminService
         _ragService = ragService;
         _wikipediaService = wikipediaService;
         _documentRepository = documentRepository;
+        _documentQueueService = documentQueueService;
         _logger = logger;
     }
 
@@ -894,12 +897,43 @@ public class AdminService : IAdminService
             {
                 foreach (var job in uploadResponse.Jobs)
                 {
+                    var ragJobId = job.JobId ?? $"pending_{internalBatchId}";
                     jobsList.Add(new {
                         // Sử dụng toán tử ?? để tránh trả về null cho client
-                        job_id = job.JobId ?? $"pending_{internalBatchId}",
+                        job_id = ragJobId,
                         file_name = job.FileName, 
                         status = job.Status ?? "queued"
                     });
+
+                    // Also enqueue the same job to the Graph pipeline so the
+                    // Graph-RAG worker can build the knowledge graph in parallel.
+                    if (_documentQueueService != null && ragJobId != null && !ragJobId.StartsWith("pending_"))
+                    {
+                        var wikiFileUrl = $"https://{language}.wikipedia.org/api/rest_v1/page/mobile-html/{Uri.EscapeDataString(title.Replace(" ", "_"))}";
+                        var graphJob = new DocumentProcessingJobDto
+                        {
+                            JobId = ragJobId,
+                            DocumentId = string.Empty,
+                            UserId = "admin",
+                            FileName = Path.GetFileNameWithoutExtension(fileName) + ".html",
+                            FileUrl = wikiFileUrl,
+                            FileType = "html",
+                            RetryCount = 0,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        try
+                        {
+                            await _documentQueueService.EnqueueGraphTaskAsync(graphJob);
+                            _logger.LogInformation(
+                                "Enqueued Wikipedia article '{Title}' (job {JobId}) to Graph pipeline",
+                                title, ragJobId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex,
+                                "Failed to enqueue Wikipedia job {JobId} to Graph pipeline", ragJobId);
+                        }
+                    }
                 }
             }
             else

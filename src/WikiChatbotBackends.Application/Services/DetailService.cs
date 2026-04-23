@@ -30,20 +30,20 @@ public class DetailService : IDetailService
             if (string.IsNullOrWhiteSpace(dto.Title))
                 throw new ArgumentException("Title is required");
 
-var document = new Document
-{
-    Id = Guid.NewGuid(),
-    CategoryId = dto.CategoryId,
-    FileName = dto.Title,
-    Description = dto.Content ?? "Chưa có mô tả nội dung.",
-    Status = "active",
-    SourceType = "manual",
-    FilePath = "",
-    FileSize = 0,
-    ContentHash = "",
-    CreatedAt = DateTime.UtcNow,
-    UpdatedAt = DateTime.UtcNow
-};
+            var document = new Document
+            {
+                Id = Guid.NewGuid(),
+                CategoryId = dto.CategoryId,
+                FileName = dto.Title,
+                Description = dto.Content ?? "Chưa có mô tả nội dung.",
+                Status = "active",
+                SourceType = "manual",
+                FilePath = "",
+                FileSize = 0,
+                ContentHash = "",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
 
             await _detailRepository.AddAsync(document);
             return document.Id;
@@ -108,7 +108,9 @@ var document = new Document
             {
                 Id = document.Id,
                 Title = document.FileName,
-                Content = document.Description ?? string.Empty,
+                Content = document.Content,
+                Description = document.Description,
+                ThumbnailUrl = document.ThumbnailUrl,
                 WikipediaUrl = document.WikipediaUrl,
                 CategoryId = document.CategoryId ?? Guid.Empty,
                 CategoryName = string.Empty,
@@ -132,7 +134,9 @@ var document = new Document
             {
                 Id = d.Id,
                 Title = d.FileName,
-                Content = d.Description ?? string.Empty,
+                Content = d.Content,
+                Description = d.Description,
+                ThumbnailUrl = d.ThumbnailUrl,
                 WikipediaUrl = d.WikipediaUrl,
                 CategoryId = d.CategoryId ?? Guid.Empty,
                 CategoryName = string.Empty,
@@ -154,16 +158,21 @@ var document = new Document
             var allDetails = new List<DetailDto>();
             foreach (var cat in categories)
             {
-                var documents = cat.Documents.Select(d => new DetailDto
-                {
-                    Id = d.Id,
-                    Title = d.FileName,
-                    Content = d.Description ?? string.Empty,
-                    WikipediaUrl = null,
-                    CategoryId = d.CategoryId ?? Guid.Empty,
-                    CategoryName = cat.Name,
-                    CreatedAt = d.CreatedAt
-                }).ToList();
+                var documents = cat.Documents
+                    .Where(d => !d.IsDeleted && d.SourceType != "cloudinary")
+                    .Select(d => new DetailDto
+                    {
+                        Id = d.Id,
+                        Title = d.FileName,
+                        Content = d.Content,
+                        Description = d.Description,
+                        ThumbnailUrl = d.ThumbnailUrl,
+                        WikipediaUrl = d.WikipediaUrl,
+                        CategoryId = d.CategoryId ?? Guid.Empty,
+                        CategoryName = cat.Name,
+                        CreatedAt = d.CreatedAt
+                    })
+                    .ToList();
                 allDetails.AddRange(documents);
             }
             return allDetails.OrderBy(d => d.CategoryName).ThenBy(d => d.Title).ToList();
