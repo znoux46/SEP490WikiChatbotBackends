@@ -99,6 +99,7 @@ public class DocumentController : ControllerBase
 
             var existingDocument = await _documentRepository.GetByCategoryAndWikipediaUrlAsync(dto.CategoryId, wikipediaResult.WikipediaUrl);
             var jobIds = new List<string>();
+            Guid resultDocumentId = Guid.Empty;
 
             if (existingDocument != null)
             {
@@ -115,6 +116,8 @@ public class DocumentController : ControllerBase
                 existingDocument.ThumbnailUrl = wikipediaResult.ThumbnailUrl;
                 existingDocument.UpdatedAt = DateTime.UtcNow;
                 await _documentRepository.UpdateAsync(existingDocument);
+
+                resultDocumentId = existingDocument.Id;
 
                 var taskId = ExtractTaskIdFromMetadata(existingDocument.Metadata);
                 if (!string.IsNullOrWhiteSpace(taskId))
@@ -164,6 +167,8 @@ public class DocumentController : ControllerBase
                     document.UpdatedAt = DateTime.UtcNow;
                     await _documentRepository.UpdateAsync(document);
 
+                    resultDocumentId = document.Id;
+
                     var taskId = ExtractTaskIdFromMetadata(document.Metadata);
                     if (!string.IsNullOrWhiteSpace(taskId))
                     {
@@ -185,6 +190,7 @@ public class DocumentController : ControllerBase
                 language = language,
                 wikipediaUrl = wikipediaResult.WikipediaUrl,
                 thumbnailUrl = wikipediaResult.ThumbnailUrl,
+                documentId = resultDocumentId != Guid.Empty ? resultDocumentId.ToString() : (string?)null,
                 jobId = uniqueJobIds.FirstOrDefault() ?? string.Empty,
                 jobIds = uniqueJobIds,
             });
