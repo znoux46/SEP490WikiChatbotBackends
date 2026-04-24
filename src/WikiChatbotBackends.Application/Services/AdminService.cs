@@ -970,32 +970,50 @@ public class AdminService : IAdminService
     /// </summary>
     public async Task<WikipediaJobStatusResponseDto?> GetWikipediaJobStatusAsync(string jobId)
     {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return null;
+        }
+
         try
         {
-            var status = await _ragService.GetJobStatusAsync(jobId);
-            if (status == null)
+            var document = await _documentRepository.GetByTaskIdAsync(jobId);
+            if (document == null)
+            {
                 return null;
+            }
 
-            // Map RAG status to Wikipedia DTO
-            // Lưu ý: Chuyển các thuộc tính từ snake_case sang PascalCase (S, D, F, P, M, E...)
+            var metadata = ParseMetadata(document.Metadata);
+            var pipelineMessages = TryGetObjectProperty(metadata, "pipeline_messages");
+
+            var message = ReadJsonString(pipelineMessages, "graph");
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                message = ReadJsonString(pipelineMessages, "rag");
+            }
+
+            var error = ReadJsonString(pipelineMessages, "graph_error");
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                error = ReadJsonString(pipelineMessages, "rag_error");
+            }
+
+            var composedStatus = (document.Status ?? "unknown").Trim().ToLowerInvariant();
+
             return new WikipediaJobStatusResponseDto
             {
                 job_id = jobId,
-                status = status.Status?.ToLower() ?? "unknown",
-                document_id = status.DocumentId,
-                file_name = status.FileName ?? "wikipedia_doc.txt",
-                progress = TryParseProgress(status.Progress, status.Status),
-                message = status.Message ?? "Processing...",
-                error = status.Error,
+                status = string.IsNullOrWhiteSpace(composedStatus) ? "unknown" : composedStatus,
+                document_id = document.Id.ToString(),
+                file_name = string.IsNullOrWhiteSpace(document.FileName) ? "wikipedia_doc.txt" : document.FileName,
+                progress = MapProgressFromDocumentStatus(composedStatus),
+                message = !string.IsNullOrWhiteSpace(message) ? message : "Processing...",
+                error = string.IsNullOrWhiteSpace(error) ? null : error,
                 timing = new {
-                    start = status.StartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-dd HH:mm:ss"),
-                    end = status.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""
+                    start = document.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    end = composedStatus == "completed" ? document.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss") : ""
                 }
             };
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            return null;
         }
         catch (Exception ex)
         {
@@ -1045,6 +1063,66 @@ public class AdminService : IAdminService
         }
 
         return progressValue;
+    }
+
+    private static int MapProgressFromDocumentStatus(string? status)
+    {
+        var normalized = (status ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "completed" => 100,
+            "rag_completed_waiting_graph" => 70,
+            "indexing" => 50,
+            "processing" => 50,
+            "pending" => 10,
+            "failed" => 0,
+            _ => 0
+        };
+    }
+
+    private static JsonElement ParseMetadata(string? metadata)
+    {
+        if (string.IsNullOrWhiteSpace(metadata))
+        {
+            return default;
+        }
+
+        try
+        {
+            using var json = JsonDocument.Parse(metadata);
+            return json.RootElement.Clone();
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
+    private static JsonElement TryGetObjectProperty(JsonElement node, string propertyName)
+    {
+        if (node.ValueKind != JsonValueKind.Object)
+        {
+            return default;
+        }
+
+        return node.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Object
+            ? value
+            : default;
+    }
+
+    private static string ReadJsonString(JsonElement node, string propertyName)
+    {
+        if (node.ValueKind != JsonValueKind.Object)
+        {
+            return string.Empty;
+        }
+
+        if (!node.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String)
+        {
+            return string.Empty;
+        }
+
+        return value.GetString() ?? string.Empty;
     }
 
     private static string HashPassword(string password)
