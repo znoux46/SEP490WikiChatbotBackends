@@ -1,9 +1,12 @@
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using System.Data.SqlTypes;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
-using Microsoft.Extensions.Logging;
 
 namespace WikiChatbotBackends.Application.Services;
 
@@ -14,19 +17,22 @@ public class AuthService : IAuthService
     private readonly IOtpService _otpService;
     private readonly IEmailService _emailService;
     private readonly ILogger<AuthService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AuthService(
         IRepository<User> userRepository, 
         IJwtService jwtService,
         IOtpService otpService,
         IEmailService emailService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IHttpContextAccessor httpContextAccessor    )
     {
         _userRepository = userRepository;
         _jwtService = jwtService;
         _otpService = otpService;
         _emailService = emailService;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<LoginResponseDto> RegisterAsync(RegisterDto dto)
@@ -135,30 +141,35 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<string> ForgotPasswordAsync(string email)
+    public async Task<string?> ForgotPasswordAsync(string email)
     {
-        // Check if user exists
+        if (string.IsNullOrWhiteSpace(email))
+            throw new InvalidOperationException("Email không được để trống.");
+
+        if (!IsValidEmail(email))
+            throw new InvalidOperationException("Email không hợp lệ");
+
         var users = await _userRepository.FindAsync(u => u.Email == email);
         var user = users.FirstOrDefault();
-        
+
         if (user == null)
-            throw new KeyNotFoundException($"No user found with email: {email}");
+        {
+            _logger.LogWarning($"Email không tồn tại: {email}");
+            return null;
+        }
 
         try
         {
-            // Generate OTP
             var otp = await _otpService.GenerateOtpAsync(user.Id);
-            
-            // Send OTP email
             await _emailService.SendOtpEmailAsync(email, otp, user.FullName);
-            
-            _logger.LogInformation($"OTP sent successfully to {email}");
+
+            _logger.LogInformation($"OTP gửi tới {email}");
             return otp;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Failed to send OTP email to {email}");
-            throw new InvalidOperationException("Failed to send OTP. Please try again later.", ex);
+            _logger.LogError(ex, $"Lỗi gửi OTP {email}");
+            throw;
         }
     }
 
@@ -215,6 +226,46 @@ public class AuthService : IAuthService
         }
 
         return true;
+    }
+
+    public async Task<bool> ChangePasswordAsync(string oldPassword, string newPassword, string confirmPassword)
+    {
+        // Validate passwords match
+        if (newPassword != confirmPassword)
+            throw new InvalidOperationException("Confirm password does not match");
+
+        // Validate password strength
+        if (newPassword.Length < 8)
+            throw new InvalidOperationException("Password must be at least 8 characters long");
+        var httpContext = _httpContextAccessor.HttpContext;
+        var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        int userId = 0;
+        if (!int.TryParse(userIdClaim, out userId))
+        {
+            // Nếu bạn muốn cho phép lưu lịch sử cho khách (Anonymous), 
+            // bạn cần một UserId mặc định hoặc bỏ qua logic này.
+            // userId = 0;
+            throw new UnauthorizedAccessException("Invalid token");
+        }
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null || !VerifyPassword(oldPassword, user.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid old password");
+        // Update password
+        user.PasswordHash = HashPassword(newPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user);
+
+        return true;
+    }
+
+    private static bool IsValidEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        var emailPattern = @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
+
+        return Regex.IsMatch(email, emailPattern);
     }
 
     private static string HashPassword(string password)

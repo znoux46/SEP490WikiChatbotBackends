@@ -10,6 +10,7 @@ public interface IAdminService
     Task<AdminUserDto> UpdateUserAsync(int userId, UpdateUserDto dto);
     Task<bool> DeleteUserAsync(int userId);
     Task<AdminUserDto> UpdateUserRoleAsync(int userId, string role);
+    Task<int> CreateUserAsync(CreateUserDto createUser);
 
     // Statistics
     Task<AdminStatsDto> GetStatisticsAsync();
@@ -24,12 +25,21 @@ public interface IAdminService
     Task<PagedResultDto<AdminChatSessionDto>> GetAllChatSessionsAsync(ChatSessionQueryDto query);
     Task<AdminChatSessionDto?> GetChatSessionByIdAsync(Guid sessionId);
     Task<bool> DeleteChatSessionAsync(Guid sessionId);
-    Task<bool> DeleteAllUserChatSessionsAsync(int userId);
+    Task<bool> DeleteAllUserChatSessionsAsync(int userId);    
 
-    // Document Management - Wikipedia Import
-    Task<AddDocumentFromWikipediaResponseDto> AddDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
-    
-    // Document Management - Wikipedia Edit
-    Task<AddDocumentFromWikipediaResponseDto> EditDocumentFromWikipediaAsync(AddDocumentFromWikipediaRequestDto request);
+    Task<WikipediaGenerateNodeResponseDto> GenerateWikipediaNodeAsync(WikipediaGenerateNodeRequestDto request);
+
+    // Person Summary from Wikipedia
+    Task<PersonSummaryResponseDto> GetPersonSummaryAsync(PersonSummaryRequestDto request);
+
+    /// <summary>
+    /// Start Wikipedia chunking job: extract content, queue for async processing
+    /// </summary>
+    Task<WikipediaChunkingResponseDto> StartWikipediaChunkingAsync(WikipediaChunkingRequestDto request);
+
+    /// <summary>
+    /// Get status of Wikipedia chunking job
+    /// </summary>
+    Task<WikipediaJobStatusResponseDto?> GetWikipediaJobStatusAsync(string jobId);
 }
 

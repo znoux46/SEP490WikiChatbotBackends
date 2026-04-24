@@ -5,12 +5,13 @@ namespace WikiChatbotBackends.Application.Interfaces;
 
 public interface IChatSessionRepository : IRepository<ChatSession>
 {
-    Task<IEnumerable<ChatSession>> GetChatSessionsAsync(
+Task<IEnumerable<ChatSession>> GetChatSessionsAsync(
         Expression<Func<ChatSession, bool>>? predicate = null,
         Func<IQueryable<ChatSession>, IOrderedQueryable<ChatSession>>? orderBy = null,
         int? skip = null,
         int? take = null,
-        bool includeUser = false);
+        bool includeUser = false,
+        bool includeHistories = false);
     
     Task<int> CountChatSessionsAsync(Expression<Func<ChatSession, bool>>? predicate = null);
     

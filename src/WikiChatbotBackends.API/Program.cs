@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Infrastructure;
 using WikiChatbotBackends.Infrastructure.Data;
 
@@ -104,11 +105,11 @@ var app = builder.Build();
 // Configure the HTTP request pipeline
 //if (app.Environment.IsDevelopment())
 //{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Wikipedia Chatbot API v1");
-    });
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Wikipedia Chatbot API v1");
+});
 //}
 
 // app.UseHttpsRedirection();
@@ -121,7 +122,14 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.EnsureCreated();
+    dbContext.Database.Migrate();
+
+    // Ensure Redis task queue keys exist (sentinel keeps them visible when empty)
+    var queueService = scope.ServiceProvider.GetService<IDocumentQueueService>();
+    if (queueService != null)
+    {
+        await queueService.EnsureTaskQueuesInitializedAsync();
+    }
 }
 
 app.Run();

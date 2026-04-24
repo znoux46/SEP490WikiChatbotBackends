@@ -1,9 +1,10 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using WikiChatbotBackends.Application.DTOs;
 using WikiChatbotBackends.Application.Interfaces;
 using WikiChatbotBackends.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace WikiChatbotBackends.API.Controllers;
 
@@ -13,11 +14,13 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IRepository<User> _userRepository;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, IRepository<User> userRepository)
+    public AuthController(IAuthService authService, IRepository<User> userRepository, ILogger<AuthController> logger)
     {
         _authService = authService;
         _userRepository = userRepository;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -85,24 +88,31 @@ public class AuthController : ControllerBase
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(dto?.Email))
+                return BadRequest(new { message = "Email không được để trống." });
+
             var otp = await _authService.ForgotPasswordAsync(dto.Email);
+
+            if (otp == null)
+            {
+                return BadRequest(new { message = "Email không tồn tại trong hệ thống." });
+            }
+
             return Ok(new ForgotPasswordResponseDto
             {
                 Success = true,
-                Message = "If an account with this email exists, an OTP has been sent."
+                Message = "OTP đã được gửi tới email của bạn."
             });
         }
-        catch (KeyNotFoundException ex)
+        catch (InvalidOperationException ex)
         {
-            return Ok(new ForgotPasswordResponseDto
-            {
-                Success = true,
-                Message = "If an account with this email exists, an OTP has been sent."
-            }); // Don't reveal if email exists
+            _logger.LogWarning($"Validation failed: {ex.Message}");
+            return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            _logger.LogError(ex, "Unexpected error in forgot password");
+            return BadRequest(new { message = "Có lỗi xảy ra, vui lòng thử lại." });
         }
     }
 
@@ -165,6 +175,25 @@ public class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Unauthorized(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<UserDto>> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        try
+        {
+            var user = await _authService.ChangePasswordAsync(dto.OldPassword,dto.NewPassword,dto.ConfirmPassword);
+            return Ok(user);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
         catch (Exception ex)
         {

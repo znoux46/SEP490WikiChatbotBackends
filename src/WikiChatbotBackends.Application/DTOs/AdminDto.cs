@@ -12,6 +12,16 @@ public class AdminUserDto
     public DateTime UpdatedAt { get; set; }
 }
 
+public class CreateUserDto
+{
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+    public string Role { get; set; } = string.Empty;
+}
+
 public class UpdateUserRoleDto
 {
     public string Role { get; set; } = string.Empty;
@@ -49,7 +59,7 @@ public class UserQueryDto
     public string? SearchTerm { get; set; }
     public string? Role { get; set; }
     public string? SortBy { get; set; } = "CreatedAt";
-    public bool SortDescending { get; set; } = true;
+    public bool? SortDescending { get; set; } = true;
 }
 
 public class PagedResultDto<T>
@@ -168,6 +178,16 @@ public class UpdateDetailDto
     public string? WikipediaUrl { get; set; }
 }
 
+public class DetailQueryDto
+{
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public Guid? CategoryId { get; set; }
+    public string? SearchTerm { get; set; }
+    public string? SortBy { get; set; } = "CreatedAt";
+    public bool SortDescending { get; set; } = true;
+}
+
 #region Wikipedia Document Import
 
 /// <summary>
@@ -282,6 +302,24 @@ public class WikipediaSearchResult
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Thumbnail { get; set; }
+}
+
+/// <summary>
+/// Response from Wikipedia REST API Summary or Mobile-Sections endpoint
+/// </summary>
+public class WikipediaFullContentResponse
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    
+    // Extract: Vẫn giữ để chứa đoạn tóm tắt ngắn (Lead section)
+    public string Extract { get; set; } = string.Empty;
+    
+    // FullContent: Thuộc tính mới để chứa toàn bộ nội dung từ các mục (Sections)
+    public string? FullContent { get; set; } 
+    
+    public string? Timestamp { get; set; }
+    public WikipediaContentUrls? ContentUrls { get; set; }
 }
 
 #endregion

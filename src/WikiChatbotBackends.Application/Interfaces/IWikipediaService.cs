@@ -23,5 +23,16 @@ public interface IWikipediaService
     /// <param name="limit">Maximum results (default: 10)</param>
     /// <returns>List of search results</returns>
     Task<List<WikipediaSearchResult>> SearchAsync(string query, string language = "en", int limit = 10);
+
+    Task<WikipediaFullContentResponse?> GetArticleFullContentAsync(string title, string language = "en");
+
+    /// <summary>
+    /// Search Wikipedia pages using generator search endpoint for document import use-cases.
+    /// </summary>
+    /// <param name="keyword">Search keyword</param>
+    /// <param name="language">Language code (default: vi)</param>
+    /// <param name="limit">Maximum results (default: 5)</param>
+    /// <returns>Formatted and sorted search items for frontend</returns>
+    Task<List<WikipediaDocumentSearchItemDto>> SearchDocumentsAsync(string keyword, string language = "vi", int limit = 5);
 }
 

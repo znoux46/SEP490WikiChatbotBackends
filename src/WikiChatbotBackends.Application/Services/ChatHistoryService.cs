@@ -30,10 +30,9 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = session.SessionId,
             SessionName = session.SessionName,
+            ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
-            LastMessageAt = session.ChatHistories.Any() 
-                ? session.ChatHistories.Max(h => h.CreatedAt) 
-                : session.CreatedAt,
+            LastMessageAt = session.UpdatedAt,
             MessageCount = session.ChatHistories.Count
         }).OrderByDescending(s => s.LastMessageAt);
     }
@@ -49,6 +48,7 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = session.SessionId,
             SessionName = session.SessionName,
+            ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
             UpdatedAt = session.UpdatedAt
         };
@@ -61,6 +61,7 @@ public class ChatHistoryService : IChatHistoryService
             UserId = userId,
             SessionId = dto.SessionId,
             SessionName = dto.SessionName,
+            ActivePerson= dto.ActivePerson,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -70,6 +71,7 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = created.SessionId,
             SessionName = created.SessionName,
+            ActivePerson = created.ActivePerson,
             CreatedAt = created.CreatedAt,
             UpdatedAt = created.UpdatedAt
         };
@@ -90,6 +92,7 @@ public class ChatHistoryService : IChatHistoryService
         {
             SessionId = session.SessionId,
             SessionName = session.SessionName,
+            ActivePerson = session.ActivePerson,
             CreatedAt = session.CreatedAt,
             UpdatedAt = session.UpdatedAt
         };
@@ -143,6 +146,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = ch.SessionId,
             Question = ch.Question,
             Answer = ch.Answer,
+            AIModel = ch.AIModel,
             CreatedAt = ch.CreatedAt
         });
     }
@@ -160,6 +164,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = dto.SessionId,
             Question = dto.Question,
             Answer = dto.Answer,
+            AIModel = dto.AIModel,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -176,6 +181,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = created.SessionId,
             Question = created.Question,
             Answer = created.Answer,
+            AIModel = created.AIModel,
             CreatedAt = created.CreatedAt
         };
     }
@@ -194,6 +200,7 @@ public class ChatHistoryService : IChatHistoryService
 
         history.Question = dto.Question;
         history.Answer = dto.Answer;
+        history.AIModel = dto.AIModel;
         history.UpdatedAt = DateTime.UtcNow;
 
         await _chatHistoryRepository.UpdateAsync(history);
@@ -203,6 +210,7 @@ public class ChatHistoryService : IChatHistoryService
             SessionId = history.SessionId,
             Question = history.Question,
             Answer = history.Answer,
+            AIModel = history.AIModel,
             CreatedAt = history.CreatedAt
         };
     }
@@ -225,24 +233,33 @@ public class ChatHistoryService : IChatHistoryService
     /// <summary>
     /// Tự động lấy thông tin từ HttpContext để lưu lịch sử Chat
     /// </summary>
-    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer, Guid sessionId)
+    public async Task<string> SaveChatHistoryWithContextAsync(string question, string answer,string AIModel, string ActivePerson, Guid sessionId)
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext == null) return string.Empty;
 
+        var sessionIdString = (sessionId != Guid.Empty) ? sessionId : Guid.NewGuid();
+
+        if (httpContext == null) return sessionIdString.ToString();
+
+
+        int userId = 0;
         // 1. Lấy UserId từ Claims (nếu không có thì mặc định là 0 hoặc xử lý tùy ý)
         var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out int userId))
+        if (int.TryParse(userIdClaim, out int parsedId))
         {
             // Nếu bạn muốn cho phép lưu lịch sử cho khách (Anonymous), 
             // bạn cần một UserId mặc định hoặc bỏ qua logic này.
-            userId = 0;
+            // userId = 0;
+
+            userId = parsedId;
         }
+
+        // var sessionIdString = (sessionId != Guid.Empty) ? sessionId : Guid.NewGuid();
 
         try
         {
             // 2. Lấy SessionId (GUID string) từ Header hoặc tạo mới
-            var sessionIdString = sessionId!=Guid.Empty ? sessionId: Guid.NewGuid();
+            // var sessionIdString = sessionId!=Guid.Empty ? sessionId: Guid.NewGuid();
 
             // 3. Tìm hoặc tạo Session dựa trên SessionId (string) và UserId
             var sessions = await _sessionRepository.FindAsync(s => s.UserId == userId && s.SessionId == sessionIdString);
@@ -251,42 +268,72 @@ public class ChatHistoryService : IChatHistoryService
             if (session == null)
             {
                 // Tạo session mới nếu chưa tồn tại
-                var newSession = new ChatSession
+                // var newSession = new ChatSession
+                // {
+                //     UserId = userId,
+                //     SessionId = sessionIdString,
+                //     ActivePerson = ActivePerson,
+                //     SessionName = question.Length > 30 ? question.Substring(0, 27) + "..." : question,
+                //     CreatedAt = DateTime.UtcNow,
+                //     UpdatedAt = DateTime.UtcNow
+                // };
+                // var created = await _sessionRepository.AddAsync(newSession);
+
+                await _sessionRepository.AddAsync(new ChatSession
                 {
-                    UserId = userId,
+                    UserId = userId, // Sẽ là null nếu là Anonymous
                     SessionId = sessionIdString,
+                    ActivePerson = ActivePerson,
                     SessionName = question.Length > 30 ? question.Substring(0, 27) + "..." : question,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
-                };
-                var created = await _sessionRepository.AddAsync(newSession);
+                });
+
             }
             else
             {
                 // Cập nhật thời gian cho Session
                 session.UpdatedAt = DateTime.UtcNow;
+                session.ActivePerson = ActivePerson; // Cập nhật ActivePerson nếu cần
                 await _sessionRepository.UpdateAsync(session);
             }
 
-            // 4. Lưu vào ChatHistory
+            // 4. Lưu ChatHistory (uncommented & fixed)
             var history = new ChatHistory
             {
                 SessionId = sessionIdString,
                 Question = question,
                 Answer = answer,
+                AIModel = AIModel,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-
             await _chatHistoryRepository.AddAsync(history);
 
-            return sessionIdString.ToString(); // Trả về SessionId để client có thể sử dụng cho các lần gọi tiếp theo
+            // Update session timestamp
+            var updatedSessions = await _sessionRepository.FindAsync(s => s.SessionId == sessionIdString);
+            if (updatedSessions.Any())
+            {
+                var theSession = updatedSessions.First();
+                theSession.UpdatedAt = DateTime.UtcNow;
+                await _sessionRepository.UpdateAsync(theSession);
+            }
         }
         catch (Exception ex)
         {
             // Log lỗi nhưng không làm gián đoạn luồng trả lời của AI
             // _logger.LogError(ex, "Failed to save history in service");
-            return string.Empty;
+            // return string.Empty;
+
+            // Bước 2: Log lỗi để em biết DB đang bị gì (Double Insert, Connection...)
+            // _logger.LogError(ex, "Lưu lịch sử thất bại cho User {UserId}, Session {SessionId}", userId, sessionIdString);
+
+            // Bước 3: QUAN TRỌNG NHẤT
+            // Dù lưu DB thất bại, ta vẫn trả về sessionIdString mà ta đã tạo ở trên.
+            // Frontend sẽ nhận được ID này, coi như "phiên chat tạm" và không báo lỗi UI.
         }
+
+        return sessionIdString.ToString();
+
     }
 }

@@ -66,6 +66,25 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// Create user
+    /// </summary>
+    [HttpPost("user")]
+    public async Task<ActionResult<int>> CreateNewUser(CreateUserDto createUser)
+    {
+        try
+        {
+            var userId = await _adminService.CreateUserAsync(createUser);
+
+            return Ok(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error create user {UserName}", createUser.Username);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Update user information
     /// </summary>
     [HttpPut("users/{userId}")]
@@ -442,21 +461,58 @@ public class AdminController : ControllerBase
     #region Detail Management
 
     /// <summary>
-    /// Get all details for admin (temporary - use category/details later)
+    /// Get details for admin with pagination and filtering
     /// </summary>
     [HttpGet("details")]
-    public async Task<ActionResult<List<DetailDto>>> GetDetails()
+    public async Task<ActionResult<PagedResultDto<DetailDto>>> GetDetails([FromQuery] DetailQueryDto query)
     {
         try
         {
-            var categories = await _categoryService.GetAllAsync();
-            var allDetails = new List<DetailDto>();
-            foreach (var cat in categories)
+            var pageNumber = query.PageNumber < 1 ? 1 : query.PageNumber;
+            var pageSize = query.PageSize < 1 ? 10 : Math.Min(query.PageSize, 100);
+
+            var details = await _detailService.GetAllAsync();
+            var filtered = details.AsEnumerable();
+
+            if (query.CategoryId.HasValue)
             {
-                var details = await _detailService.GetByCategoryIdAsync(cat.Id);
-                allDetails.AddRange(details);
+                filtered = filtered.Where(d => d.CategoryId == query.CategoryId.Value);
             }
-            return Ok(allDetails);
+
+            if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+            {
+                var keyword = query.SearchTerm.Trim();
+                filtered = filtered.Where(d =>
+                    (d.Title?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (d.Content?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            filtered = (query.SortBy ?? "CreatedAt").ToLowerInvariant() switch
+            {
+                "title" => query.SortDescending
+                    ? filtered.OrderByDescending(d => d.Title)
+                    : filtered.OrderBy(d => d.Title),
+                "categoryname" => query.SortDescending
+                    ? filtered.OrderByDescending(d => d.CategoryName)
+                    : filtered.OrderBy(d => d.CategoryName),
+                _ => query.SortDescending
+                    ? filtered.OrderByDescending(d => d.CreatedAt)
+                    : filtered.OrderBy(d => d.CreatedAt)
+            };
+
+            var totalCount = filtered.Count();
+            var items = filtered
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(new PagedResultDto<DetailDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+            });
         }
         catch (Exception ex)
         {
@@ -541,6 +597,81 @@ public class AdminController : ControllerBase
     #endregion
 
     /// <summary>
+    /// Generate person summary from Wikipedia for admin use
+    /// </summary>
+    [HttpPost("wikipedia/person-summary")]
+    public async Task<ActionResult<PersonSummaryResponseDto>> PersonSummary([FromBody] PersonSummaryRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Admin requested person summary for {EntityName}", request.EntityName);
+            var result = await _adminService.GetPersonSummaryAsync(request);
+            if (result.Status == "success")
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in wikipedia/person-summary");
+            return StatusCode(500, new PersonSummaryResponseDto { Status = "error", Message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/admin/wikipedia/chunking - Start Wikipedia content chunking job
+    /// </summary>
+    [HttpPost("wikipedia/chunking")]
+    public async Task<ActionResult<WikipediaChunkingResponseDto>> StartWikipediaChunking([FromBody] WikipediaChunkingRequestDto request)
+    {
+        try
+        {
+            _logger.LogInformation("Admin started Wikipedia chunking for {Name}", request.Name);
+            var result = await _adminService.StartWikipediaChunkingAsync(request);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid request for Wikipedia chunking");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Wikipedia article not found");
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in wikipedia/chunking");
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// GET /api/admin/wikipedia/chunk-status/{jobId} - Check job status
+    /// </summary>
+    [HttpGet("wikipedia/chunk-status/{jobId}")]
+    public async Task<ActionResult<WikipediaJobStatusResponseDto>> GetWikipediaChunkStatus(string jobId)
+    {
+        try
+        {
+            _logger.LogInformation("Checking Wikipedia chunk status for job {JobId}", jobId);
+            var status = await _adminService.GetWikipediaJobStatusAsync(jobId);
+            if (status == null)
+            {
+                return NotFound(new { message = $"Job {jobId} not found" });
+            }
+            return Ok(status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting chunk status {JobId}", jobId);
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Health check endpoint for admin panel
     /// </summary>
     [HttpGet("health")]
@@ -550,76 +681,28 @@ public class AdminController : ControllerBase
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
     }
 
-    #region Document Management - Wikipedia Import
-
     /// <summary>
-    /// Add a document from Wikipedia by specifying a historical figure's name
+    /// Generate Neo4j nodes from Wikipedia article: fetch → RAG txt → GraphRAG /upload
+    /// Like /documents/wikipedia but + GraphRAG node generation
     /// </summary>
-    /// <param name="request">Request containing the name of the historical figure</param>
-    /// <returns>Information about the imported document</returns>
-    [HttpPost("documents/wikipedia")]
-    public async Task<ActionResult<AddDocumentFromWikipediaResponseDto>> AddDocumentFromWikipedia(
-        [FromBody] AddDocumentFromWikipediaRequestDto request)
+    [HttpPost("wikipedia/generate-node")]
+    public async Task<ActionResult<WikipediaGenerateNodeResponseDto>> GenerateWikipediaNode([FromBody] WikipediaGenerateNodeRequestDto request)
     {
         try
         {
-            _logger.LogInformation("Adding document from Wikipedia: {Name}", request.Name);
-
-            var result = await _adminService.AddDocumentFromWikipediaAsync(request);
-
-            if (!result.Success)
+            _logger.LogInformation("Wikipedia/generate-node: {Name} (lang: {Lang})", request.Name, request.Language);
+            var result = await _adminService.GenerateWikipediaNodeAsync(request);
+            if (result.Success)
             {
-                return BadRequest(result);
+                return Ok(result);
             }
-
-            _logger.LogInformation("Successfully added document from Wikipedia: {Title}", result.WikipediaTitle);
-            return Ok(result);
+            return BadRequest(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding document from Wikipedia: {Name}", request.Name);
-            return BadRequest(new AddDocumentFromWikipediaResponseDto
-            {
-                Success = false,
-                Message = $"Error importing document: {ex.Message}"
-            });
+            _logger.LogError(ex, "Error in wikipedia/generate-node");
+            return StatusCode(500, new WikipediaGenerateNodeResponseDto { Success = false, Message = ex.Message });
         }
     }
-
-    /// <summary>
-    /// Edit a document from Wikipedia - hard deletes old document and chunks, then re-imports fresh content
-    /// </summary>
-    /// <param name="request">Same request format as AddDocumentFromWikipedia</param>
-    /// <returns>Same response format as AddDocumentFromWikipedia</returns>
-    [HttpPost("documents/wikipedia/edit")]
-    public async Task<ActionResult<AddDocumentFromWikipediaResponseDto>> EditDocumentFromWikipedia(
-        [FromBody] AddDocumentFromWikipediaRequestDto request)
-    {
-        try
-        {
-            _logger.LogInformation("Editing document from Wikipedia: {Name}", request.Name);
-
-            var result = await _adminService.EditDocumentFromWikipediaAsync(request);
-
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
-
-            _logger.LogInformation("Successfully edited document from Wikipedia: {Title}", result.WikipediaTitle);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error editing document from Wikipedia: {Name}", request.Name);
-            return BadRequest(new AddDocumentFromWikipediaResponseDto
-            {
-                Success = false,
-                Message = $"Error updating document: {ex.Message}"
-            });
-        }
-    }
-
-    #endregion
 }
 
