@@ -39,20 +39,34 @@ public class RedisDocumentQueueService : IDocumentQueueService
         _redis = redis;
         _logger = logger;
 
-        // Shared queue config (single queue set for both RAG + Graph workers)
+        // Queue config: supports dedicated queues per pipeline.
+        // Backward-compatible fallback keeps shared queues when graph-specific
+        // keys are not provided.
         _ragTaskQueue =
+            configuration["Redis:Queues:RagTaskQueue"]
+            ??
             configuration["Redis:Queues:TaskQueue"]
             ?? DefaultSharedTaskQueue;
         _ragProcessingQueue =
+            configuration["Redis:Queues:RagProcessingQueue"]
+            ??
             configuration["Redis:Queues:ProcessingQueue"]
             ?? DefaultSharedProcessingQueue;
         _ragFailedQueue =
+            configuration["Redis:Queues:RagFailedQueue"]
+            ??
             configuration["Redis:Queues:FailedQueue"]
             ?? DefaultSharedFailedQueue;
 
-        _graphTaskQueue = _ragTaskQueue;
-        _graphProcessingQueue = _ragProcessingQueue;
-        _graphFailedQueue = _ragFailedQueue;
+        _graphTaskQueue =
+            configuration["Redis:Queues:GraphTaskQueue"]
+            ?? _ragTaskQueue;
+        _graphProcessingQueue =
+            configuration["Redis:Queues:GraphProcessingQueue"]
+            ?? _ragProcessingQueue;
+        _graphFailedQueue =
+            configuration["Redis:Queues:GraphFailedQueue"]
+            ?? _ragFailedQueue;
     }
 
     // Sentinel value pushed to task queues on startup so the Redis key never
